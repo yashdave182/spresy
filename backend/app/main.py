@@ -10,6 +10,13 @@ from .config import settings
 from .models import JobInfo, JobResult, ScrapeRequest
 from .services.job_manager import job_manager
 
+from .database import engine, Base
+from . import db_models
+
+# If using SQLite (e.g. local or Vercel fallback), create tables automatically
+if settings.DATABASE_URL.startswith("sqlite"):
+    Base.metadata.create_all(bind=engine)
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
 app = FastAPI(
