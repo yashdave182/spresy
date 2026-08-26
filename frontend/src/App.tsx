@@ -481,7 +481,7 @@ function ScraperApp({ onBack }: { onBack: () => void }) {
     setJobId(null)
 
     try {
-      const response = await fetch(`${API_BASE}/api/scrape`, {
+      const response = await fetch(`${API_BASE.replace(/\/$/, '')}/api/scrape`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -507,7 +507,7 @@ function ScraperApp({ onBack }: { onBack: () => void }) {
 
   const pollJob = async (id: string) => {
     try {
-      const response = await fetch(`${API_BASE}/api/jobs/${id}/result`)
+      const response = await fetch(`${API_BASE.replace(/\/$/, '')}/api/jobs/${id}/result`)
       if (!response.ok) throw new Error('Failed to get results')
 
       const data = await response.json()
@@ -596,7 +596,7 @@ function ScraperApp({ onBack }: { onBack: () => void }) {
             <div className="results-header">
               <span className="results-title">Discovered Leads {results.length > 0 && `(${results.length})`}</span>
               {jobId && !loading && (
-                <a href={`${API_BASE}/api/jobs/${jobId}/csv`} className="download-link" download>
+                <a href={`${API_BASE.replace(/\/$/, '')}/api/jobs/${jobId}/csv`} className="download-link" download>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true" style={{ marginRight: '4px' }}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
                   Download CSV
                 </a>
