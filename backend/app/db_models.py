@@ -1,6 +1,6 @@
 import datetime
 from sqlalchemy import Column, String, Float, Boolean, ForeignKey, DateTime, Integer
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.types import JSON
 from sqlalchemy.orm import relationship
 from .database import Base
 
@@ -12,9 +12,6 @@ class JobRecord(Base):
     keyword = Column(String, nullable=False)
     location = Column(String, nullable=True)
     error = Column(String, nullable=True)
-    # Store stats as JSON. For SQLite compatibility we can just use JSON, 
-    # but SQLAlchemy allows importing JSON which works across dialects.
-    from sqlalchemy.types import JSON
     stats = Column(JSON, nullable=True, default={})
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
