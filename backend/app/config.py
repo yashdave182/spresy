@@ -79,5 +79,9 @@ if settings.ENV == "production" and not settings.DATABASE_URL:
     raise ValueError("CRITICAL: DATABASE_URL is not set but ENV is production. Server cannot start.")
 if not settings.DATABASE_URL:
     import os
-    db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "spresy.db")
+    if os.environ.get("VERCEL") == "1":
+        # Vercel has a read-only filesystem except for /tmp
+        db_path = "/tmp/spresy.db"
+    else:
+        db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "spresy.db")
     settings.DATABASE_URL = f"sqlite:///{db_path}"
