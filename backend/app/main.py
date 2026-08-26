@@ -16,9 +16,12 @@ from . import db_models
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
-# Ensure tables exist (handles Vercel cold-starts where /tmp is wiped)
-if settings.DATABASE_URL.startswith("sqlite"):
-    Base.metadata.create_all(bind=engine)
+# Ensure tables exist on all DB types (handles Vercel PostgreSQL and SQLite fallback)
+# checkfirst=True makes this a no-op if tables already exist
+try:
+    Base.metadata.create_all(bind=engine, checkfirst=True)
+except Exception as _db_init_err:
+    logging.getLogger("spresy").warning(f"DB table init warning: {_db_init_err}")
 
 app = FastAPI(
     title="Spresy Lead Scraper API",
@@ -91,9 +94,11 @@ def root():
 async def start_scrape(req: ScrapeRequest):
     import asyncio
 
-    # Re-ensure tables exist on every cold start (Vercel wipes /tmp between invocations)
-    if settings.DATABASE_URL.startswith("sqlite"):
-        Base.metadata.create_all(bind=engine)
+    # Re-ensure tables exist (safe no-op if already present)
+    try:
+        Base.metadata.create_all(bind=engine, checkfirst=True)
+    except Exception:
+        pass
 
     job = job_manager.create(req)
     job_manager.mark_status(job.id, "running")
