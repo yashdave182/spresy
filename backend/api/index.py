@@ -5,18 +5,20 @@ import traceback
 # Add backend directory to sys.path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+_startup_error_body = None
+
 try:
     from app.main import app
-except Exception as _startup_error:
-    # Surface the real error in the HTTP response body for diagnosis
-    _error_body = traceback.format_exc()
+except Exception:
+    _startup_error_body = traceback.format_exc()
+    app = None  # will be replaced below
+
+if app is None:
     from fastapi import FastAPI
     from fastapi.responses import PlainTextResponse
     app = FastAPI()
+    _err = _startup_error_body
 
     @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"])
     async def _error_handler(path: str = ""):
-        return PlainTextResponse(
-            f"Startup Error:\n\n{_error_body}",
-            status_code=500,
-        )
+        return PlainTextResponse(f"Startup Error:\n\n{_err}", status_code=500)

@@ -69,19 +69,23 @@ def root():
 
 @app.post("/api/scrape", response_model=JobInfo)
 async def start_scrape(req: ScrapeRequest):
+    import asyncio
     job = job_manager.create(req)
     job_manager.mark_status(job.id, "running")
-    
-    from .services.pipeline import ScrapePipeline
-    pipeline = ScrapePipeline(job)
-    try:
-        await pipeline.run()
-        job_manager.mark_done(job.id)
-    except Exception as e:
-        import logging
-        logging.getLogger("spresy").error(f"Scrape failed: {e}")
-        job_manager.mark_error(job.id, str(e))
-        
+
+    async def _run_pipeline(job_id: str):
+        from .services.pipeline import ScrapePipeline
+        _job = job_manager.get(job_id)
+        pipeline = ScrapePipeline(_job)
+        try:
+            await pipeline.run()
+            job_manager.mark_done(job_id)
+        except Exception as e:
+            logging.getLogger("spresy").error(f"Scrape failed: {e}")
+            job_manager.mark_error(job_id, str(e))
+
+    # Fire and forget — client polls /api/jobs/{id}/result
+    asyncio.create_task(_run_pipeline(job.id))
     return job_manager.get(job.id)
 
 @app.get("/api/jobs/{job_id}", response_model=JobInfo)
