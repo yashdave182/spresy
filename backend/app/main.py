@@ -1,9 +1,10 @@
 import logging
+import traceback
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from .config import settings
@@ -13,11 +14,11 @@ from .services.job_manager import job_manager
 from .database import engine, Base
 from . import db_models
 
-# If using SQLite (e.g. local or Vercel fallback), create tables automatically
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+
+# Ensure tables exist (handles Vercel cold-starts where /tmp is wiped)
 if settings.DATABASE_URL.startswith("sqlite"):
     Base.metadata.create_all(bind=engine)
-
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
 app = FastAPI(
     title="Spresy Lead Scraper API",
@@ -40,6 +41,25 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ---------------------------------------------------------------------------
+# Global error handler — always includes CORS headers so browser can read body
+# ---------------------------------------------------------------------------
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    origin = request.headers.get("origin", "*")
+    tb = traceback.format_exc()
+    logging.getLogger("spresy").error(f"Unhandled error: {exc}\n{tb}")
+    return JSONResponse(
+        status_code=500,
+        content={"error": str(exc), "detail": tb},
+        headers={
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Credentials": "true",
+        },
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -70,6 +90,11 @@ def root():
 @app.post("/api/scrape", response_model=JobInfo)
 async def start_scrape(req: ScrapeRequest):
     import asyncio
+
+    # Re-ensure tables exist on every cold start (Vercel wipes /tmp between invocations)
+    if settings.DATABASE_URL.startswith("sqlite"):
+        Base.metadata.create_all(bind=engine)
+
     job = job_manager.create(req)
     job_manager.mark_status(job.id, "running")
 
