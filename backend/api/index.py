@@ -5,13 +5,14 @@ import traceback
 # Add backend directory to sys.path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# Must be assigned unconditionally at top level for Vercel's Python runtime static scanner
+app = None
 _startup_error_body = None
 
 try:
     from app.main import app
 except Exception:
     _startup_error_body = traceback.format_exc()
-    app = None  # will be replaced below
 
 if app is None:
     from fastapi import FastAPI
