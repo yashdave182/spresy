@@ -1,0 +1,48 @@
+import logging
+from typing import List
+from urllib.parse import quote_plus
+
+from bs4 import BeautifulSoup
+
+from .base import BaseScraper
+
+logger = logging.getLogger("spresy.startpage")
+
+
+class StartpageScraper(BaseScraper):
+    """
+    Startpage (privacy proxy over Google) search results.
+    Reliable, no API key required.
+    """
+
+    name = "startpage"
+    display_name = "Startpage"
+    yields_leads = False
+
+    async def search(self, query: str, limit: int = 20) -> List[dict]:
+        results: List[dict] = []
+        url = f"https://www.startpage.com/sp/search?query={quote_plus(query)}"
+        try:
+            resp = await self.client.get(url)
+            if resp.status_code != 200:
+                logger.debug("Startpage returned %s", resp.status_code)
+                return results
+            soup = BeautifulSoup(resp.text, "lxml")
+            for result in soup.select(".w-gl__result, .result, [data-testid='result']")[:limit]:
+                link = result.select_one("a.result-link, h2 a, a[href]")
+                if not link:
+                    continue
+                href = link.get("href", "")
+                if href.startswith(("//", "#", "javascript:")):
+                    continue
+                snippet = result.select_one(".w-gl__description, .result-description, p")
+                title = link.get_text(strip=True) or href
+                results.append({
+                    "name": title,
+                    "website": href,
+                    "description": snippet.get_text(strip=True) if snippet else "",
+                    "title": title,
+                })
+        except Exception as e:
+            logger.warning("Startpage search failed for %s: %s", query, e)
+        return results

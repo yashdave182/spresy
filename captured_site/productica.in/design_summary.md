@@ -1,0 +1,257 @@
+# Design Summary — productica.in
+
+Pages crawled: 1
+
+## Colors
+
+| Value | Occurrences |
+|---|---|
+| `#fff` | 202 |
+| `#000` | 145 |
+| `#090` | 13 |
+| `#181` | 11 |
+| `rgb(255 255 255 / 0)` | 11 |
+| `rgb(0 0 0 / .1)` | 11 |
+| `rgba(var(--marker-color)` | 10 |
+| `rgb(0 0 0 / var(--tw-text-opacity, 1)` | 9 |
+| `#111` | 9 |
+| `rgb(255 255 255 / var(--tw-text-opacity, 1)` | 9 |
+| `rgba(var(--road-color)` | 9 |
+| `#a1a` | 7 |
+| `#e5e` | 6 |
+| `rgb(255 255 255 / var(--tw-bg-opacity, 1)` | 6 |
+| `#0f1` | 6 |
+| `#e4e` | 6 |
+| `rgb(0 0 0 / var(--tw-bg-opacity, 1)` | 6 |
+| `#9ca` | 5 |
+| `#3f3` | 5 |
+| `#272` | 5 |
+| `#030` | 5 |
+| `#0a0` | 5 |
+| `rgba(255,255,255,.02)` | 5 |
+| `rgb(0 0 0 / 0)` | 5 |
+| `rgba(255,255,255,.2)` | 5 |
+| `rgba(255,255,255,.5)` | 5 |
+| `rgba(255,255,255,.06)` | 5 |
+| `#374` | 4 |
+| `#d1d` | 4 |
+| `#334` | 4 |
+| `#cbd` | 4 |
+| `#e2e` | 4 |
+| `#525` | 4 |
+| `#d4d` | 4 |
+| `rgba(255,255,255,.25)` | 4 |
+| `rgba(255,255,255,.3)` | 4 |
+| `#4b5` | 3 |
+| `rgb(255 255 255 / 10%)` | 3 |
+| `rgb(0 0 0 / 50%)` | 3 |
+| `#475` | 3 |
+
+## Font Families
+
+| Value | Occurrences |
+|---|---|
+| `'Inter'` | 6 |
+| `'Outfit'` | 5 |
+| `ui-sans-serif,system-ui,sans-serif,"Apple Color Emoji","Segoe UI Emoji",Segoe UI Symbol,"Noto Color Emoji"` | 3 |
+| `inherit` | 3 |
+| `ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,Liberation Mono,Courier New,monospace` | 2 |
+| `ui-serif,Georgia,Cambria,Times New Roman,Times,serif` | 1 |
+| `SF Mono,Fira Code,monospace` | 1 |
+| `-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif` | 1 |
+| `monospace` | 1 |
+
+## Font Sizes
+
+| Value | Occurrences |
+|---|---|
+| `1rem` | 13 |
+| `.875em` | 12 |
+| `.875rem` | 9 |
+| `1.5rem` | 8 |
+| `1.875rem` | 6 |
+| `.75rem` | 6 |
+| `.8571429em` | 5 |
+| `.7rem` | 5 |
+| `1.25em` | 4 |
+| `1.125rem` | 4 |
+| `.9em` | 3 |
+| `2.25rem` | 3 |
+| `3rem` | 3 |
+| `1.25rem` | 3 |
+| `6rem` | 3 |
+| `1.1rem` | 3 |
+| `.65rem` | 3 |
+| `.8rem` | 3 |
+| `inherit` | 2 |
+| `2.25em` | 2 |
+| `1.5em` | 2 |
+| `1.2857143em` | 2 |
+| `12px` | 2 |
+| `13px` | 2 |
+| `14px` | 2 |
+| `15px` | 2 |
+| `17px` | 2 |
+| `3.75rem` | 2 |
+| `4.5rem` | 2 |
+| `.85rem` | 2 |
+
+## Spacing (margin/padding/gap)
+
+| Value | Occurrences |
+|---|---|
+| `0` | 76 |
+| `2rem` | 38 |
+| `1rem` | 32 |
+| `.5rem` | 31 |
+| `1.25em` | 26 |
+| `1.5rem` | 25 |
+| `3rem` | 22 |
+| `2em` | 20 |
+| `4rem` | 20 |
+| `.25rem` | 17 |
+| `.75rem` | 17 |
+| `1.25rem` | 15 |
+| `1.1428571em` | 13 |
+| `2.5rem` | 13 |
+| `1.7142857em` | 12 |
+| `.5714286em` | 11 |
+| `.375rem` | 11 |
+| `6rem` | 11 |
+| `5rem` | 10 |
+| `.5em` | 8 |
+| `.75em` | 8 |
+| `.125rem` | 8 |
+| `7rem` | 8 |
+| `8rem` | 8 |
+| `1.6em` | 7 |
+| `.8571429em` | 6 |
+| `.6666667em` | 6 |
+| `auto` | 6 |
+| `.625rem` | 6 |
+| `0 auto` | 6 |
+| `.875rem` | 5 |
+| `0 1.5rem` | 5 |
+| `1.2em` | 4 |
+| `3em` | 4 |
+| `.8888889em` | 4 |
+| `.1875em` | 4 |
+| `3.5rem` | 4 |
+| `10rem` | 4 |
+| `.2857143em` | 3 |
+| `-1rem` | 3 |
+
+## Border Radii
+
+| Value | Occurrences |
+|---|---|
+| `50%` | 13 |
+| `20px` | 5 |
+| `16px` | 4 |
+| `.3125rem` | 3 |
+| `.375rem` | 3 |
+| `999px` | 3 |
+| `8px` | 3 |
+| `.25rem` | 2 |
+| `1rem` | 2 |
+| `1.5rem` | 2 |
+| `24px` | 2 |
+| `.75rem` | 2 |
+| `4px` | 2 |
+| `14px` | 2 |
+| `6px` | 2 |
+| `12px` | 2 |
+| `0` | 1 |
+| `18px` | 1 |
+| `22px` | 1 |
+| `9999px` | 1 |
+
+## Box Shadows
+
+| Value | Occurrences |
+|---|---|
+| `var(--tw-ring-offset-shadow, 0 0 #0000),var(--tw-ring-shadow, 0 0 #0000),var(--tw-shadow)` | 32 |
+| `var(--tw-ring-offset-shadow),var(--tw-ring-shadow),var(--tw-shadow, 0 0 #0000)` | 4 |
+| `0 4px 32px #0000004d,inset 0 1px #ffffff0a` | 3 |
+| `inset 0 0 20px #ffffff1a,0 0 30px #ffffff0d` | 3 |
+| `0 10px 40px #00000080,inset 0 0 0 1px #ffffff0d` | 2 |
+| `none` | 1 |
+| `0 0 0 1px var(--tw-prose-kbd-shadows),0 3px 0 var(--tw-prose-kbd-shadows)` | 1 |
+| `0 8px 48px #0006,0 0 0 1px #ffffff0f,inset 0 1px #ffffff14` | 1 |
+| `inset 0 0 30px #fff3,0 0 50px #ffffff1a` | 1 |
+| `0 0 15px rgba(var(--marker-color),.15)` | 1 |
+| `0 8px 32px rgba(var(--marker-color),.3),0 0 20px rgba(var(--marker-color),.4)` | 1 |
+| `inset 0 0 25px #fff3,0 0 45px #ffffff1a` | 1 |
+| `inset 0 0 20px #ffffff14,0 0 30px #ffffff0a` | 1 |
+| `0 0 20px #fff3,0 0 40px #ffffff14` | 1 |
+| `0 8px 32px #00000080,inset 0 0 0 1px #ffffff08` | 1 |
+| `inset 0 0 20px #fff0,0 0 #fff0` | 1 |
+| `inset 0 0 30px #ffffff40,0 0 60px #ffffff26` | 1 |
+| `0 0 20px #fff3` | 1 |
+| `0 20px 40px #000c` | 1 |
+| `inset 0 0 40px #ffffff05` | 1 |
+
+## CSS Custom Properties (design tokens / vars)
+
+| Variable | Top values (value: count) |
+|---|---|
+| `--tw-text-opacity` | `1`: 41 |
+| `--tw-shadow` | `var(--tw-shadow-colored)`: 5, `0 0 #0000`: 2, `0 25px 50px -12px rgb(0 0 0 / .25)`: 2, `0 10px 15px -3px rgb(0 0 0 / .1), 0 4px 6px -4px rgb(0 0 0 / .1)`: 2, `0 4px 6px -1px rgb(0 0 0 / .1), 0 2px 4px -2px rgb(0 0 0 / .1)`: 2 |
+| `--tw-gradient-to` | `rgb(255 255 255 / 0) var(--tw-gradient-to-position)`: 11, `rgb(0 0 0 / 0) var(--tw-gradient-to-position)`: 5, `rgb(9 9 11 / 0) var(--tw-gradient-to-position)`: 3, `rgb(10 10 14 / 0) var(--tw-gradient-to-position)`: 2, `rgb(3 3 3 / 0) var(--tw-gradient-to-position)`: 1 |
+| `--tw-shadow-colored` | `0 0 20px var(--tw-shadow-color)`: 5, `0 0 8px var(--tw-shadow-color)`: 3, `0 0 #0000`: 2, `0 25px 50px -12px var(--tw-shadow-color)`: 2, `0 0 0 1px var(--tw-shadow-color)`: 2 |
+| `--tw-bg-opacity` | `1`: 33 |
+| `--tw-scale-x` | `1`: 5, `1.25`: 2, `1.5`: 2, `1.8`: 2, `1.05`: 2 |
+| `--tw-scale-y` | `1`: 4, `1.25`: 2, `1.5`: 2, `1.8`: 2, `1.05`: 2 |
+| `--tw-gradient-stops` | `var(--tw-gradient-from), var(--tw-gradient-to)`: 15, `var(--tw-gradient-from), rgb(10 10 14 / .7) var(--tw-gradient-via-position), var(--tw-gradient-to)`: 1, `var(--tw-gradient-from), #000 var(--tw-gradient-via-position), var(--tw-gradient-to)`: 1, `var(--tw-gradient-from), rgb(0 0 0 / .6) var(--tw-gradient-via-position), var(--tw-gradient-to)`: 1, `var(--tw-gradient-from), transparent var(--tw-gradient-via-position), var(--tw-gradient-to)`: 1 |
+| `--tw-blur` | ``: 2, `blur(120px)`: 2, `blur(24px)`: 2, `blur(8px)`: 1, `blur(40px)`: 1 |
+| `--tw-border-opacity` | `1`: 15 |
+| `--tw-gradient-from` | `rgb(255 255 255 / .05) var(--tw-gradient-from-position)`: 2, `#030303 var(--tw-gradient-from-position)`: 1, `#0a0a0e var(--tw-gradient-from-position)`: 1, `#000 var(--tw-gradient-from-position)`: 1, `rgb(250 250 249 / .5) var(--tw-gradient-from-position)`: 1 |
+| `--tw-space-y-reverse` | `0`: 14 |
+| `--tw-translate-x` | `0`: 2, `.5rem`: 2, `-50%`: 1, `-.125rem`: 1, `0px`: 1 |
+| `--tw-translate-y` | `0`: 2, `-50%`: 2, `2rem`: 1, `100%`: 1, `-2px`: 1 |
+| `--tw-backdrop-blur` | ``: 2, `blur(40px)`: 1, `blur(12px)`: 1, `blur(4px)`: 1, `blur(24px)`: 1 |
+| `--tw-ring-color` | `rgb(59 130 246 / .5)`: 2, `rgb(255 255 255 / .25)`: 1, `rgb(255 255 255 / .2)`: 1, `rgb(255 255 255 / .4)`: 1, `rgb(255 255 255 / .6)`: 1 |
+| `--tw-ring-offset-shadow` | `var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color)`: 4, `0 0 #0000`: 2 |
+| `--tw-ring-shadow` | `0 0 #0000`: 2, `var(--tw-ring-inset) 0 0 0 calc(1px + var(--tw-ring-offset-width)) var(--tw-ring-color)`: 2, `var(--tw-ring-inset) 0 0 0 calc(3px + var(--tw-ring-offset-width)) var(--tw-ring-color)`: 1, `var(--tw-ring-inset) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color)`: 1 |
+| `--tw-grayscale` | ``: 2, `grayscale(0)`: 2, `grayscale(100%)`: 1 |
+| `--tw-shadow-color` | `rgb(0 0 0 / .03)`: 1, `rgb(255 255 255 / .1)`: 1, `rgb(255 255 255 / .02)`: 1, `rgb(255 255 255 / .2)`: 1, `rgb(255 255 255 / .03)`: 1 |
+| `--tw-drop-shadow` | ``: 2, `drop-shadow(0 1px 2px rgb(0 0 0 / .1)) drop-shadow(0 1px 1px rgb(0 0 0 / .06))`: 1, `drop-shadow(0 0 8px rgba(255,255,255,.5))`: 1 |
+| `--tw-prose-body` | `#374151`: 1, `#334155`: 1, `#3f3f46`: 1, `var(--tw-prose-invert-body)`: 1 |
+| `--tw-prose-headings` | `#111827`: 1, `#0f172a`: 1, `#18181b`: 1, `var(--tw-prose-invert-headings)`: 1 |
+| `--tw-prose-lead` | `#4b5563`: 1, `#475569`: 1, `#52525b`: 1, `var(--tw-prose-invert-lead)`: 1 |
+| `--tw-prose-links` | `#111827`: 1, `#0f172a`: 1, `#18181b`: 1, `var(--tw-prose-invert-links)`: 1 |
+| `--tw-prose-bold` | `#111827`: 1, `#0f172a`: 1, `#18181b`: 1, `var(--tw-prose-invert-bold)`: 1 |
+| `--tw-prose-counters` | `#6b7280`: 1, `#64748b`: 1, `#71717a`: 1, `var(--tw-prose-invert-counters)`: 1 |
+| `--tw-prose-bullets` | `#d1d5db`: 1, `#cbd5e1`: 1, `#d4d4d8`: 1, `var(--tw-prose-invert-bullets)`: 1 |
+| `--tw-prose-hr` | `#e5e7eb`: 1, `#e2e8f0`: 1, `#e4e4e7`: 1, `var(--tw-prose-invert-hr)`: 1 |
+| `--tw-prose-quotes` | `#111827`: 1, `#0f172a`: 1, `#18181b`: 1, `var(--tw-prose-invert-quotes)`: 1 |
+| `--tw-prose-quote-borders` | `#e5e7eb`: 1, `#e2e8f0`: 1, `#e4e4e7`: 1, `var(--tw-prose-invert-quote-borders)`: 1 |
+| `--tw-prose-captions` | `#6b7280`: 1, `#64748b`: 1, `#71717a`: 1, `var(--tw-prose-invert-captions)`: 1 |
+| `--tw-prose-kbd` | `#111827`: 1, `#0f172a`: 1, `#18181b`: 1, `var(--tw-prose-invert-kbd)`: 1 |
+| `--tw-prose-kbd-shadows` | `rgb(17 24 39 / 10%)`: 1, `rgb(15 23 42 / 10%)`: 1, `rgb(24 24 27 / 10%)`: 1, `var(--tw-prose-invert-kbd-shadows)`: 1 |
+| `--tw-prose-code` | `#111827`: 1, `#0f172a`: 1, `#18181b`: 1, `var(--tw-prose-invert-code)`: 1 |
+| `--tw-prose-pre-code` | `#e5e7eb`: 1, `#e2e8f0`: 1, `#e4e4e7`: 1, `var(--tw-prose-invert-pre-code)`: 1 |
+| `--tw-prose-pre-bg` | `#1f2937`: 1, `#1e293b`: 1, `#27272a`: 1, `var(--tw-prose-invert-pre-bg)`: 1 |
+| `--tw-prose-th-borders` | `#d1d5db`: 1, `#cbd5e1`: 1, `#d4d4d8`: 1, `var(--tw-prose-invert-th-borders)`: 1 |
+| `--tw-prose-td-borders` | `#e5e7eb`: 1, `#e2e8f0`: 1, `#e4e4e7`: 1, `var(--tw-prose-invert-td-borders)`: 1 |
+| `--tw-rotate` | `0`: 2, `180deg`: 1 |
+| `--tw-scroll-snap-strictness` | `proximity`: 2, `mandatory`: 1 |
+| `--tw-numeric-spacing` | ``: 2, `tabular-nums`: 1 |
+| `--tw-ring-offset-width` | `0px`: 2, `2px`: 1 |
+| `--tw-ring-offset-color` | `#fff`: 2, `#000`: 1 |
+| `--tw-invert` | ``: 2, `invert(100%)`: 1 |
+| `--tw-prose-invert-body` | `#d1d5db`: 1, `#cbd5e1`: 1, `#d4d4d8`: 1 |
+| `--tw-prose-invert-headings` | `#fff`: 3 |
+| `--tw-prose-invert-lead` | `#9ca3af`: 1, `#94a3b8`: 1, `#a1a1aa`: 1 |
+| `--tw-prose-invert-links` | `#fff`: 3 |
+| `--tw-prose-invert-bold` | `#fff`: 3 |
+| `--tw-prose-invert-counters` | `#9ca3af`: 1, `#94a3b8`: 1, `#a1a1aa`: 1 |
+| `--tw-prose-invert-bullets` | `#4b5563`: 1, `#475569`: 1, `#52525b`: 1 |
+| `--tw-prose-invert-hr` | `#374151`: 1, `#334155`: 1, `#3f3f46`: 1 |
+| `--tw-prose-invert-quotes` | `#f3f4f6`: 1, `#f1f5f9`: 1, `#f4f4f5`: 1 |
+| `--tw-prose-invert-quote-borders` | `#374151`: 1, `#334155`: 1, `#3f3f46`: 1 |
+| `--tw-prose-invert-captions` | `#9ca3af`: 1, `#94a3b8`: 1, `#a1a1aa`: 1 |
+| `--tw-prose-invert-kbd` | `#fff`: 3 |
+| `--tw-prose-invert-kbd-shadows` | `rgb(255 255 255 / 10%)`: 3 |
+| `--tw-prose-invert-code` | `#fff`: 3 |
+| `--tw-prose-invert-pre-code` | `#d1d5db`: 1, `#cbd5e1`: 1, `#d4d4d8`: 1 |

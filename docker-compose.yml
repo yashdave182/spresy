@@ -1,0 +1,27 @@
+# =============================================================================
+# Spresy — Docker Compose (single-command startup)
+# Usage:
+#   docker compose up --build
+#   Open http://localhost:9000
+# =============================================================================
+
+services:
+  spresy:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "9000:9000"
+    env_file:
+      - backend/.env
+    environment:
+      - SERVE_FRONTEND=true
+    volumes:
+      # Persist SQLite database and CSV exports across container restarts
+      - spresy-data:/app/backend/output
+      - spresy-db:/app/backend
+    restart: unless-stopped
+
+volumes:
+  spresy-data:
+  spresy-db:

@@ -1,0 +1,16 @@
+{
+  "start_url": "https://productica.in/",
+  "pages_crawled": 1,
+  "pages": [
+    {
+      "url": "https://productica.in/",
+      "saved_html": "pages/index.html",
+      "css_files": [
+        "style_0_https_fonts.googleapis.com_css2_family_Inter_wght_300_400_500_600_700_800_family_Outfit_wght_300_400_500_600_700_display.css",
+        "style_1_https_productica.in_assets_index-C5WCPwmC.css"
+      ],
+      "inline_style_blocks": 0,
+      "inline_style_attrs": 0
+    }
+  ]
+}
