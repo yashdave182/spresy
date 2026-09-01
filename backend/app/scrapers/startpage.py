@@ -26,7 +26,7 @@ class StartpageScraper(BaseScraper):
         url = f"https://www.startpage.com/sp/search?query={quote_plus(query)}"
         try:
             resp = await self.client.get(url)
-            if resp.status_code != 200:
+            if resp.status_code >= 300:
                 logger.debug("Startpage returned %s", resp.status_code)
                 return results
             soup = BeautifulSoup(resp.text, "lxml")

@@ -70,12 +70,12 @@ DEFAULT_SOURCES = [
 # On Vercel: only sources that work reliably without proxies/Playwright
 # Removed: MCA(403), OpenCorporates(401), Yelp scraper(403), YellowPages(404),
 #           ZaubaCorp(403), BBB(US-only), DuckDuckGo(202 blocked),
-#           IndiaMART (returns products not businesses), JustDial(403)
+#           IndiaMART (returns products not businesses), JustDial(403),
+#           TradeIndia (company directory 404s on long-tail searches)
 VERCEL_DEFAULT_SOURCES = [
     "bing",           # Reliable search — now yields leads directly
     "startpage",      # Privacy-Google proxy — now yields leads directly
     "sulekha",        # India local services directory
-    "tradeindia",     # India B2B company directory (fixed URL)
     "yelp_fusion",    # Official Yelp API (if YELP_API_KEY is set)
     "google_places",  # Official Google Places API (if GOOGLE_PLACES_KEY is set)
 ]

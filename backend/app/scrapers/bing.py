@@ -52,7 +52,7 @@ class BingScraper(BaseScraper):
         url = f"https://www.bing.com/search?q={quote_plus(query)}&count={limit}"
         try:
             resp = await self.client.get(url)
-            if resp.status_code != 200:
+            if resp.status_code >= 300:
                 return results
             soup = BeautifulSoup(resp.text, "lxml")
             for li in soup.select("li.b_algo")[:limit]:
@@ -76,3 +76,4 @@ class BingScraper(BaseScraper):
         except Exception as e:
             logger.warning("Bing search failed for %s: %s", query, e)
         return results
+
