@@ -22,11 +22,19 @@ def _decode_bing_url(href: str) -> str:
         # Bing encodes the real URL as base64 (sometimes prefixed with 'a1')
         try:
             b64 = target[2:] if target.startswith("a1") else target
-            decoded = base64.b64decode(b64).decode("utf-8", errors="ignore")
+            # Add padding
+            b64 += "=" * ((4 - len(b64) % 4) % 4)
+            # Use urlsafe decode and fallback to standard decode
+            decoded = base64.urlsafe_b64decode(b64).decode("utf-8", errors="ignore")
             if decoded.startswith("http"):
                 return decoded
         except Exception:
-            pass
+            try:
+                decoded = base64.b64decode(b64).decode("utf-8", errors="ignore")
+                if decoded.startswith("http"):
+                    return decoded
+            except Exception:
+                pass
         return unquote(target)
     return href
 

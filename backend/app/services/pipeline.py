@@ -243,6 +243,12 @@ class ScrapePipeline:
                 dir_batches = await asyncio.gather(*dir_tasks)
                 for batch in dir_batches:
                     for item in batch:
+                        url = item.get("website") or item.get("url")
+                        if url:
+                            domain = urlparse(url).netloc.lower().replace("www.", "")
+                            if domain in WRAPPER_DOMAINS or domain in IRRELEVANT_DOMAINS:
+                                continue
+                        
                         lead = self._lead_from(item)
                         lead_results.append(lead)
                         # Write to DB immediately so polling shows partial results
