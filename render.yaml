@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: spresy-backend
+    env: docker
+    region: ohio
+    plan: free
+    dockerfilePath: ./Dockerfile
+    branch: main
+    healthCheckPath: /
+    envVars:
+      - key: VERCEL
+        value: "0"
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: NIM_API_KEY
+        sync: false
