@@ -98,7 +98,10 @@ class JobManager:
             leads = []
             for r in leads_records:
                 l_dict = {c.name: getattr(r, c.name) for c in r.__table__.columns}
-                # Pydantic model Lead might have slightly different names, but we made them match
+                # DB id is an auto-increment Integer; Lead.id expects a str — convert it
+                l_dict["id"] = str(l_dict.get("id", ""))
+                # Remove job_id — not a field on Lead
+                l_dict.pop("job_id", None)
                 leads.append(Lead(**l_dict))
                 
             req = ScrapeRequest(keyword=job.keyword, location=job.location)
