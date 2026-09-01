@@ -13,7 +13,7 @@ python-dotenv==1.0.1
 tldextract==5.1.3
 # Optional: for JS-heavy anti-bot sources (JustDial/Sulekha).
 # Install separately:  pip install playwright && playwright install chromium
-# playwright==1.49.0
+playwright==1.49.0
 
 sqlalchemy
 psycopg2-binary
