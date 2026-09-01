@@ -67,17 +67,17 @@ DEFAULT_SOURCES = [
     "zaubacorp", "bbb", "yelp", "yellowpages", "website", # directories + crawler
 ]
 
-# On Vercel: skip scrapers that consistently 403/401/404 and waste time
-# MCA=403, OpenCorporates=401, Yelp=403, YellowPages=404, ZaubaCorp=403, BBB=US-only, DuckDuckGo=202 blocked
+# On Vercel: only sources that work reliably without proxies/Playwright
+# Removed: MCA(403), OpenCorporates(401), Yelp scraper(403), YellowPages(404),
+#           ZaubaCorp(403), BBB(US-only), DuckDuckGo(202 blocked),
+#           IndiaMART (returns products not businesses), JustDial(403)
 VERCEL_DEFAULT_SOURCES = [
-    "yelp_fusion",           # Official API (if key set)
-    "bing",                  # Reliable, returns real results
-    "startpage",             # Good fallback search
-    "indiamart",             # India-first directory
-    "tradeindia",            # India B2B directory
-    "sulekha",               # India local services
-    "justdial",              # India local directory
-    "google_places",         # Official API (if key set)
+    "bing",           # Reliable search — now yields leads directly
+    "startpage",      # Privacy-Google proxy — now yields leads directly
+    "sulekha",        # India local services directory
+    "tradeindia",     # India B2B company directory (fixed URL)
+    "yelp_fusion",    # Official Yelp API (if YELP_API_KEY is set)
+    "google_places",  # Official Google Places API (if GOOGLE_PLACES_KEY is set)
 ]
 
 

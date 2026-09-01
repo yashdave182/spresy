@@ -1,10 +1,12 @@
 import base64
 import logging
+import os
 from typing import List
 from urllib.parse import parse_qs, quote_plus, urlparse, unquote
 
 from bs4 import BeautifulSoup
 
+from ..utils.contact_extractor import extract_phones
 from .base import BaseScraper
 
 logger = logging.getLogger("spresy.bing")
@@ -34,7 +36,8 @@ class BingScraper(BaseScraper):
 
     name = "bing"
     display_name = "Bing"
-    yields_leads = False
+    # On Vercel the website crawler is disabled, so produce leads directly
+    yields_leads = True
 
     async def search(self, query: str, limit: int = 20) -> List[dict]:
         results: List[dict] = []
@@ -52,12 +55,15 @@ class BingScraper(BaseScraper):
                 href = _decode_bing_url(href)
                 snippet = li.select_one(".b_caption p, .b_lineclamp2, .b_caption")
                 caption = li.select_one("cite, .b_attribution")
+                snippet_text = snippet.get_text(strip=True) if snippet else ""
+                phones = extract_phones(snippet_text)
                 results.append({
                     "name": link.get_text(strip=True),
                     "website": href,
-                    "description": snippet.get_text(strip=True) if snippet else "",
-                    "title": link.get_text(strip=True),
-                    "display_url": caption.get_text(strip=True) if caption else "",
+                    "description": snippet_text,
+                    "phone": phones[0] if phones else None,
+                    "address": self.location or None,
+                    "source": "bing",
                 })
         except Exception as e:
             logger.warning("Bing search failed for %s: %s", query, e)

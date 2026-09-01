@@ -4,6 +4,7 @@ from urllib.parse import quote_plus
 
 from bs4 import BeautifulSoup
 
+from ..utils.contact_extractor import extract_phones
 from .base import BaseScraper
 
 logger = logging.getLogger("spresy.startpage")
@@ -13,11 +14,12 @@ class StartpageScraper(BaseScraper):
     """
     Startpage (privacy proxy over Google) search results.
     Reliable, no API key required.
+    Produces leads directly — website crawler disabled on Vercel.
     """
 
     name = "startpage"
     display_name = "Startpage"
-    yields_leads = False
+    yields_leads = True  # Produce leads directly; crawler disabled on Vercel
 
     async def search(self, query: str, limit: int = 20) -> List[dict]:
         results: List[dict] = []
@@ -33,16 +35,21 @@ class StartpageScraper(BaseScraper):
                 if not link:
                     continue
                 href = link.get("href", "")
-                if href.startswith(("//", "#", "javascript:")):
+                if not href or href.startswith(("//", "#", "javascript:")):
                     continue
                 snippet = result.select_one(".w-gl__description, .result-description, p")
                 title = link.get_text(strip=True) or href
+                snippet_text = snippet.get_text(strip=True) if snippet else ""
+                phones = extract_phones(snippet_text)
                 results.append({
                     "name": title,
                     "website": href,
-                    "description": snippet.get_text(strip=True) if snippet else "",
-                    "title": title,
+                    "description": snippet_text,
+                    "phone": phones[0] if phones else None,
+                    "address": self.location or None,
+                    "source": "startpage",
                 })
         except Exception as e:
             logger.warning("Startpage search failed for %s: %s", query, e)
         return results
+
