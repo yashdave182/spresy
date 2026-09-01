@@ -67,12 +67,18 @@ class NIMEngine:
                     max_tokens=150,
                     response_format={"type": "json_object"},
                 ),
-                timeout=25.0,
+                timeout=15.0,
             )
             content = resp.choices[0].message.content or "{}"
             return json.loads(content)
         except Exception as e:
-            logger.debug("NIM classify failed: %s", e)
+            err_str = str(e)
+            # 410 Gone = model endpoint permanently deleted; disable to stop wasting time
+            if "410" in err_str or "404" in err_str or "Gone" in err_str:
+                logger.warning("NIM endpoint gone (410/404) — disabling NIM for this session: %s", e)
+                self.available = False
+            else:
+                logger.debug("NIM classify failed: %s", e)
             return {"category": "", "relevant": True, "summary": ""}
 
     async def dedupe_candidates(self, candidates: List[str]) -> List[int]:

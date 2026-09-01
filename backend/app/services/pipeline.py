@@ -67,6 +67,20 @@ DEFAULT_SOURCES = [
     "zaubacorp", "bbb", "yelp", "yellowpages", "website", # directories + crawler
 ]
 
+# On Vercel: skip scrapers that consistently 403/401/404 and waste time
+# MCA=403, OpenCorporates=401, Yelp=403, YellowPages=404, ZaubaCorp=403, BBB=US-only, DuckDuckGo=202 blocked
+VERCEL_DEFAULT_SOURCES = [
+    "yelp_fusion",           # Official API (if key set)
+    "bing",                  # Reliable, returns real results
+    "startpage",             # Good fallback search
+    "indiamart",             # India-first directory
+    "tradeindia",            # India B2B directory
+    "sulekha",               # India local services
+    "justdial",              # India local directory
+    "google_places",         # Official API (if key set)
+]
+
+
 MAX_DISCOVERED_SITES = 20  # Reduced from 60 — website crawler too slow on Vercel
 
 # Domains that are never a business lead — filter before crawling
@@ -119,9 +133,14 @@ class ScrapePipeline:
 
     def _active_sources(self):
         """Resolve requested sources to engine classes (default = DEFAULT_SOURCES order)."""
+        import os
         if self.req.sources:
             return [SOURCES[s] for s in self.req.sources if s in SOURCES]
+        # On Vercel, use a trimmed source list — skip scrapers that always 403/401/404
+        if os.environ.get("VERCEL"):
+            return [SOURCES[s] for s in VERCEL_DEFAULT_SOURCES if s in SOURCES]
         return [SOURCES[s] for s in DEFAULT_SOURCES]
+
 
     async def run(self) -> dict:
         try:
@@ -132,7 +151,12 @@ class ScrapePipeline:
             self.job.progress.leads_found = len(leads)
             self.job.progress.total = len(leads)
             self.job.progress.percent = 100
-            csv_path = write_leads_csv(leads, settings.OUTPUT_DIR, self.req.keyword)
+            import os
+            output_dir = "/tmp/spresy_output" if os.environ.get("VERCEL") else settings.OUTPUT_DIR
+            try:
+                csv_path = write_leads_csv(leads, output_dir, self.req.keyword)
+            except Exception:
+                csv_path = ""  # CSV write failure should not crash the pipeline
             return {
                 "leads": [l.model_dump() for l in leads],
                 "csv_path": csv_path,
