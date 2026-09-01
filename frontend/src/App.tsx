@@ -642,7 +642,7 @@ function ScraperApp({ onBack }: { onBack: () => void }) {
                     <span className="lead-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.name || 'N/A'}</span>
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.category || lead.industry || 'N/A'}</span>
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.city || lead.location || 'N/A'}</span>
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.website ? <a href={lead.website} target="_blank" rel="noopener noreferrer" className="link">{new URL(lead.website).hostname}</a> : 'N/A'}</span>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.website ? <a href={lead.website.startsWith('http') ? lead.website : `https://${lead.website}`} target="_blank" rel="noopener noreferrer" className="link">{(() => { try { return new URL(lead.website.startsWith('http') ? lead.website : `https://${lead.website}`).hostname } catch { return lead.website } })()}</a> : 'N/A'}</span>
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.email ? <a href={`mailto:${lead.email}`} className="link">{lead.email}</a> : 'N/A'}</span>
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.phone || 'N/A'}</span>
                     <span>
