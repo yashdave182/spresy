@@ -83,37 +83,34 @@ VERCEL_DEFAULT_SOURCES = [
 
 MAX_DISCOVERED_SITES = 20  # Reduced from 60 — website crawler too slow on Vercel
 
-# Domains that are never a business lead — filter before crawling
+# Substring-based blocklist: if any of these are in the domain, drop it.
+# This catches yelp.ca, dictionary.cambridge.org, local.yahoo.com, etc.
+BAD_DOMAIN_FRAGMENTS = [
+    "yelp.", "yellowpages.", "tripadvisor.", "justdial.", "indiamart.", "tradeindia.",
+    "sulekha.", "zomato.", "swiggy.", "dictionary.", "yahoo.", "superpages.",
+    "restaurantji.", "facebook.", "instagram.", "twitter.", "linkedin.", "pinterest.",
+    "amazon.", "walmart.", "bestbuy.", "wikipedia.", "quora.", "reddit.", "bbc.",
+    "reuters.", "bloomberg.", "timesofindia.", "foursquare.", "opentable.", "doordash.",
+    "ubereats.", "grubhub.", "bbb.org", "cylex.", "manta.", "dexknows."
+]
+
+# Exact domains that are never a business lead
 IRRELEVANT_DOMAINS = {
-    "bestbuy.com", "amazon.com", "walmart.com", "britannica.com",
-    "merriam-webster.com", "dictionary.com", "wikihow.com",
+    "britannica.com", "merriam-webster.com", "wikihow.com",
     "independent.co.uk", "independent.ie", "the-independent.com",
-    "bbc.com", "bbc.co.uk", "reuters.com", "bloomberg.com",
-    "ndtv.com", "hindustantimes.com", "timesofindia.com", "economictimes.com",
-    "quora.com", "reddit.com", "medium.com", "substack.com",
-    "github.com", "stackoverflow.com", "npmjs.com",
+    "ndtv.com", "hindustantimes.com", "economictimes.com",
+    "medium.com", "substack.com", "github.com", "stackoverflow.com", "npmjs.com",
     "apkpure.com", "apk.support", "play.google.com",
 }
+
 # Domains that are directories/search wrappers, not the business itself.
-# They're handled by dedicated scrapers; crawling them just wastes requests.
 WRAPPER_DOMAINS = {
-    "yelp.com", "www.yelp.com", "yellowpages.com", "www.yellowpages.com",
-    "bbb.org", "www.bbb.org", "cylex.us.com", "www.cylex.us.com",
-    "manta.com", "www.manta.com", "dexknows.com", "www.dexknows.com",
     "duckduckgo.com", "bing.com", "www.bing.com", "startpage.com", "www.startpage.com",
     "google.com", "www.google.com", "googlemaps.com", "www.googlemaps.com",
-    "indiamart.com", "www.indiamart.com", "dir.indiamart.com",
-    "tradeindia.com", "www.tradeindia.com",
-    "justdial.com", "www.justdial.com",
-    "sulekha.com", "www.sulekha.com",
-    "zaubacorp.com", "www.zaubacorp.com",
-    "mca.gov.in", "www.mca.gov.in",
-    "facebook.com", "www.facebook.com", "linkedin.com", "www.linkedin.com",
-    "instagram.com", "www.instagram.com", "twitter.com", "x.com",
+    "zaubacorp.com", "www.zaubacorp.com", "mca.gov.in", "www.mca.gov.in",
     "gstatic.com", "w3.org", "schema.org", "googleusercontent.com",
-    "youtube.com", "www.youtube.com", "play.google.com", "microsoft.com", "support.microsoft.com",
+    "youtube.com", "www.youtube.com", "microsoft.com", "support.microsoft.com",
     "techcommunity.microsoft.com", "aliyun.com", "www.aliyun.com", "cn.aliyun.com",
-    "en.wikipedia.org", "wikipedia.org", "tripadvisor.com", "tripadvisor.in"
 }
 
 
@@ -227,7 +224,7 @@ class ScrapePipeline:
                         if not url:
                             continue
                         domain = urlparse(url).netloc.lower().replace("www.", "")
-                        if domain in WRAPPER_DOMAINS or domain in IRRELEVANT_DOMAINS:
+                        if domain in WRAPPER_DOMAINS or domain in IRRELEVANT_DOMAINS or any(frag in domain for frag in BAD_DOMAIN_FRAGMENTS):
                             continue
                         if url not in visited_sites:
                             visited_sites.add(url)
@@ -246,7 +243,7 @@ class ScrapePipeline:
                         url = item.get("website") or item.get("url")
                         if url:
                             domain = urlparse(url).netloc.lower().replace("www.", "")
-                            if domain in WRAPPER_DOMAINS or domain in IRRELEVANT_DOMAINS:
+                            if domain in WRAPPER_DOMAINS or domain in IRRELEVANT_DOMAINS or any(frag in domain for frag in BAD_DOMAIN_FRAGMENTS):
                                 continue
                         
                         lead = self._lead_from(item)
