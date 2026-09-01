@@ -67,8 +67,19 @@ DEFAULT_SOURCES = [
     "zaubacorp", "bbb", "yelp", "yellowpages", "website", # directories + crawler
 ]
 
-MAX_DISCOVERED_SITES = 60
+MAX_DISCOVERED_SITES = 20  # Reduced from 60 — website crawler too slow on Vercel
 
+# Domains that are never a business lead — filter before crawling
+IRRELEVANT_DOMAINS = {
+    "bestbuy.com", "amazon.com", "walmart.com", "britannica.com",
+    "merriam-webster.com", "dictionary.com", "wikihow.com",
+    "independent.co.uk", "independent.ie", "the-independent.com",
+    "bbc.com", "bbc.co.uk", "reuters.com", "bloomberg.com",
+    "ndtv.com", "hindustantimes.com", "timesofindia.com", "economictimes.com",
+    "quora.com", "reddit.com", "medium.com", "substack.com",
+    "github.com", "stackoverflow.com", "npmjs.com",
+    "apkpure.com", "apk.support", "play.google.com",
+}
 # Domains that are directories/search wrappers, not the business itself.
 # They're handled by dedicated scrapers; crawling them just wastes requests.
 WRAPPER_DOMAINS = {
@@ -182,7 +193,7 @@ class ScrapePipeline:
             all_discovered: List[dict] = []
             search_tasks = []
             for engine in search_engines:
-                for q in queries[:6]:
+                for q in queries[:3]:  # Reduced from 6
                     search_tasks.append(_run_search(engine, q))
             if search_tasks:
                 search_batches = await asyncio.gather(*search_tasks)
@@ -192,7 +203,7 @@ class ScrapePipeline:
                         if not url:
                             continue
                         domain = urlparse(url).netloc.lower().replace("www.", "")
-                        if domain in WRAPPER_DOMAINS:
+                        if domain in WRAPPER_DOMAINS or domain in IRRELEVANT_DOMAINS:
                             continue
                         if url not in visited_sites:
                             visited_sites.add(url)
@@ -202,18 +213,28 @@ class ScrapePipeline:
             # ---- Phase 3: Tier 2 directory sources (India-first) ----
             dir_tasks = []
             for engine in directory_engines:
-                for q in queries[:4]:
+                for q in queries[:2]:  # Reduced from 4 — faster, less redundancy
                     dir_tasks.append(_run_search(engine, q))
             if dir_tasks:
                 dir_batches = await asyncio.gather(*dir_tasks)
                 for batch in dir_batches:
                     for item in batch:
-                        lead_results.append(self._lead_from(item))
+                        lead = self._lead_from(item)
+                        lead_results.append(lead)
+                        # Write to DB immediately so polling shows partial results
+                        from .job_manager import job_manager
+                        job_manager.add_lead(self.job.id, lead)
+                        if len(lead_results) >= req.max_leads * 2:
+                            break  # Early exit
+                    if len(lead_results) >= req.max_leads * 2:
+                        break
             self._update("directories", f"Directory sources returned {len(lead_results)} total leads", len(lead_results), req.max_leads * 4)
 
             # ---- Phase 4: crawl discovered business websites ----
+            # Skip on Vercel (VERCEL=1) — website crawler is too slow for serverless
+            import os
             site_leads: List[Lead] = []
-            if crawler and all_discovered:
+            if crawler and all_discovered and not os.environ.get("VERCEL"):
                 sites = all_discovered[:MAX_DISCOVERED_SITES]
                 self._update("crawl", f"Crawling {len(sites)} websites for contact info...", len(site_leads), len(sites))
                 crawl_tasks = [(item.get("website") or item.get("url"), item.get("name", "")) for item in sites]

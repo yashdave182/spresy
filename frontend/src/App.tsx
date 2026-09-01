@@ -467,6 +467,7 @@ function ScraperApp({ onBack }: { onBack: () => void }) {
   const [keyword, setKeyword] = useState('')
   const [location, setLocation] = useState('')
   const [loading, setLoading] = useState(false)
+  const [loadingStage, setLoadingStage] = useState('Starting...')
   const [jobId, setJobId] = useState<string | null>(null)
   const [results, setResults] = useState<any[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -512,14 +513,27 @@ function ScraperApp({ onBack }: { onBack: () => void }) {
 
       const data = await response.json()
 
+      // Update progress message for the user
+      if (data.progress?.message) {
+        setLoadingStage(data.progress.message)
+      } else if (data.status === 'running') {
+        setLoadingStage('Searching for leads...')
+      }
+
+      // Show partial leads immediately as they arrive
       if (data.leads && data.leads.length > 0) {
         setResults(data.leads)
-        setLoading(false)
-      } else if (data.status === 'running' || data.status === 'pending') {
-        setTimeout(() => pollJob(id), 2000)
+      }
+
+      // Keep polling until the job is fully done
+      if (data.status === 'running' || data.status === 'pending' || data.status === 'partial') {
+        setTimeout(() => pollJob(id), 3000)
       } else {
-        setResults([])
+        // Job is completed or failed — stop polling
         setLoading(false)
+        if (data.leads && data.leads.length === 0) {
+          setError('No leads found for this search. Try a different keyword or location.')
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch results')
@@ -588,13 +602,23 @@ function ScraperApp({ onBack }: { onBack: () => void }) {
             </button>
           </form>
 
+          {loading && (
+            <div style={{ marginTop: '12px', color: 'var(--text-muted)', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span className="spinner" style={{ width: '12px', height: '12px', borderWidth: '2px' }}></span>
+              {loadingStage}
+            </div>
+          )}
+
           {error && <div className="error-toast" role="alert" style={{ marginTop: '20px' }}>{error}</div>}
         </div>
 
         {(results.length > 0 || loading) && (
           <div className="results-panel" role="region" aria-label="Search results" aria-live="polite">
             <div className="results-header">
-              <span className="results-title">Discovered Leads {results.length > 0 && `(${results.length})`}</span>
+              <span className="results-title">
+                Discovered Leads {results.length > 0 && `(${results.length})`}
+                {loading && results.length > 0 && <span style={{ marginLeft: '8px', fontSize: '12px', color: 'var(--accent)', fontWeight: 400 }}>finding more...</span>}
+              </span>
               {jobId && !loading && (
                 <a href={`${API_BASE.replace(/\/$/, '')}/api/jobs/${jobId}/csv`} className="download-link" download>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true" style={{ marginRight: '4px' }}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
