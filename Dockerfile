@@ -18,7 +18,7 @@ RUN npm run build
 
 
 # ---- Stage 2: Python backend + built frontend ----
-FROM python:3.12-slim
+FROM python:3.12-slim-bookworm
 
 # System deps for lxml, psycopg2-binary, etc.
 RUN apt-get update && apt-get install -y --no-install-recommends \
