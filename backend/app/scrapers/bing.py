@@ -44,8 +44,12 @@ class BingScraper(BaseScraper):
 
     name = "bing"
     display_name = "Bing"
-    # On Vercel the website crawler is disabled, so produce leads directly
-    yields_leads = True
+
+    @property
+    def yields_leads(self) -> bool:  # type: ignore[override]
+        # On Vercel the website crawler is disabled — produce leads directly.
+        # On Render/local, feed URLs to the Playwright crawler instead.
+        return bool(os.environ.get("VERCEL"))
 
     async def search(self, query: str, limit: int = 20) -> List[dict]:
         results: List[dict] = []
@@ -62,7 +66,6 @@ class BingScraper(BaseScraper):
                 href = link["href"]
                 href = _decode_bing_url(href)
                 snippet = li.select_one(".b_caption p, .b_lineclamp2, .b_caption")
-                caption = li.select_one("cite, .b_attribution")
                 snippet_text = snippet.get_text(strip=True) if snippet else ""
                 phones = extract_phones(snippet_text)
                 results.append({

@@ -41,13 +41,21 @@ class GeminiEngine:
         if not self.available:
             return await groq_engine.generate_queries(keyword, location)
 
+        loc_str = f" in {location}" if location else ""
         prompt = (
-            "You are a lead-generation search strategist. Generate 6-10 diverse, "
-            "effective search queries (one per line) to find real businesses/contacts "
-            f"for: '{keyword}'"
-            + (f" in {location}" if location else " (no specific location)")
-            + ".\nInclude varied phrasings (service names, industry terms, plural/singular, "
-            "local colloquial terms). Output ONLY the queries, one per line, no numbering."
+            f"You are a lead-generation expert. Your job is to find REAL, LOCAL BUSINESSES "
+            f"that match: '{keyword}'{loc_str}.\n\n"
+            "Generate 6 search queries designed to surface INDIVIDUAL BUSINESS WEBSITES "
+            "(e.g. a specific café's own website, a restaurant's contact page, a shop's homepage). "
+            "IMPORTANT RULES:\n"
+            "- Each query MUST be designed to return a specific business's own website, NOT lists/articles.\n"
+            "- Do NOT generate queries that would return news articles, government pages, Wikipedia, "
+            "Forbes lists, Billboard charts, or market cap databases.\n"
+            "- Use formats like: '<business type> <location> contact', "
+            "'<business type> <location> phone number', '<specific business name> <location>'.\n"
+            "- Include 1-2 queries targeting Indian directories: prefix with 'site:justdial.com' or "
+            "'site:sulekha.com' if the location is Indian.\n"
+            "- Output ONLY the raw queries, one per line, no numbering, no explanation."
         )
 
         try:

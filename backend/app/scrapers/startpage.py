@@ -1,4 +1,5 @@
 import logging
+import os
 from typing import List
 from urllib.parse import quote_plus
 
@@ -14,12 +15,16 @@ class StartpageScraper(BaseScraper):
     """
     Startpage (privacy proxy over Google) search results.
     Reliable, no API key required.
-    Produces leads directly — website crawler disabled on Vercel.
+    On Vercel: produces leads directly (crawler is disabled).
+    On Render/local: feeds URLs to the Playwright crawler.
     """
 
     name = "startpage"
     display_name = "Startpage"
-    yields_leads = True  # Produce leads directly; crawler disabled on Vercel
+
+    @property
+    def yields_leads(self) -> bool:  # type: ignore[override]
+        return bool(os.environ.get("VERCEL"))
 
     async def search(self, query: str, limit: int = 20) -> List[dict]:
         results: List[dict] = []
