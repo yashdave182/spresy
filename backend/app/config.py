@@ -60,14 +60,29 @@ class Settings(BaseSettings):
 
     @property
     def groq_api_keys(self) -> list[str]:
+        return self._collect_keys("GROQ_API_KEY")
+
+    @property
+    def gemini_api_keys(self) -> list[str]:
+        return self._collect_keys("GEMINI_API_KEY")
+
+    @property
+    def serpapi_keys(self) -> list[str]:
+        return self._collect_keys("SERPAPI_KEY")
+
+    def _collect_keys(self, prefix: str) -> list[str]:
+        """Collect all API keys matching a prefix: PREFIX, PREFIX1, PREFIX2, ..."""
         import os
         from dotenv import dotenv_values
         env_vars = dotenv_values(self.Config.env_file)
         keys = []
-        if self.GROQ_API_KEY:
-            keys.append(self.GROQ_API_KEY)
+        # The base key (e.g. GROQ_API_KEY)
+        base_val = getattr(self, prefix, "") or os.environ.get(prefix, "")
+        if base_val:
+            keys.append(base_val)
+        # Numbered keys (e.g. GROQ_API_KEY1, GROQ_API_KEY2, ...)
         for i in range(1, 100):
-            val = env_vars.get(f"GROQ_API_KEY{i}") or os.environ.get(f"GROQ_API_KEY{i}")
+            val = env_vars.get(f"{prefix}{i}") or os.environ.get(f"{prefix}{i}")
             if val:
                 keys.append(val)
         return list(dict.fromkeys(keys))

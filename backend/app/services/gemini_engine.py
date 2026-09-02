@@ -26,15 +26,43 @@ class LeadExtracted(BaseModel):
     website: Optional[str]
 
 class GeminiEngine:
-    """Primary AI engine powered by Google Gemini, with Groq fallback."""
+    """Primary AI engine powered by Google Gemini, with key rotation and Groq fallback."""
 
     def __init__(self):
-        self._api_key = settings.GEMINI_API_KEY
-        self.available = bool(self._api_key)
-        if self.available:
-            self.client = genai.Client(api_key=self._api_key)
-        else:
-            self.client = None
+        self._api_keys = settings.gemini_api_keys
+        self.available = len(self._api_keys) > 0
+        self._clients = [genai.Client(api_key=k) for k in self._api_keys]
+        self._current_index = 0
+        logger.info("GeminiEngine initialized with %d API key(s)", len(self._api_keys))
+
+    async def _execute_with_fallback(self, coro_func):
+        """Execute an API call with sticky fallback across all available Gemini keys."""
+        if not self.available:
+            return None
+
+        errors = []
+        for i in range(len(self._clients)):
+            client_idx = (self._current_index + i) % len(self._clients)
+            client = self._clients[client_idx]
+            try:
+                resp = await asyncio.wait_for(coro_func(client), timeout=25.0)
+                # Success — stick with this key
+                self._current_index = client_idx
+                return resp
+            except asyncio.TimeoutError:
+                errors.append(f"Timeout on Gemini key {client_idx}")
+                logger.debug("Gemini client %d timed out", client_idx)
+            except Exception as e:
+                error_str = str(e)
+                # 400 = bad prompt, don't retry with other keys
+                if "400" in error_str and "Bad Request" in error_str:
+                    logger.debug("Gemini 400 Bad Request on key %d: %s. Not retrying.", client_idx, e)
+                    return None
+                errors.append(error_str)
+                logger.debug("Gemini client %d failed: %s", client_idx, e)
+
+        logger.warning("All %d Gemini API keys failed. Errors: %s", len(self._clients), errors)
+        return None
 
     async def generate_queries(self, keyword: str, location: Optional[str]) -> List[str]:
         """Expand a user keyword into multiple effective search queries."""
@@ -58,21 +86,22 @@ class GeminiEngine:
             "- Output ONLY the raw queries, one per line, no numbering, no explanation."
         )
 
-        try:
-            resp = await self.client.aio.models.generate_content(
+        async def call(client):
+            return await client.aio.models.generate_content(
                 model=settings.GEMINI_MODEL,
                 contents=prompt,
                 config=types.GenerateContentConfig(temperature=0.7),
             )
-            content = resp.text or ""
-            queries = [q.strip() for q in content.splitlines() if q.strip() and not q.startswith("```")]
+
+        resp = await self._execute_with_fallback(call)
+        if resp and resp.text:
+            queries = [q.strip() for q in resp.text.splitlines() if q.strip() and not q.startswith("```")]
             if queries:
                 return queries
-        except Exception as e:
-            logger.warning("Gemini failed to generate queries: %s. Falling back to Groq.", e)
-            return await groq_engine.generate_queries(keyword, location)
 
-        return groq_engine._fallback_queries(keyword, location)
+        # Fallback to Groq
+        logger.info("Gemini query generation failed; falling back to Groq.")
+        return await groq_engine.generate_queries(keyword, location)
 
     async def qualify_lead(self, name: str, description: str = "", keyword: str = "") -> dict:
         """Score a lead (0-100) for relevance to the search keyword."""
@@ -87,8 +116,8 @@ class GeminiEngine:
             '"score" (float), "category" (string), "summary" (string).'
         )
 
-        try:
-            resp = await self.client.aio.models.generate_content(
+        async def call(client):
+            return await client.aio.models.generate_content(
                 model=settings.GEMINI_MODEL,
                 contents=prompt,
                 config=types.GenerateContentConfig(
@@ -96,24 +125,28 @@ class GeminiEngine:
                     response_mime_type="application/json",
                 ),
             )
-            if resp.text:
+
+        resp = await self._execute_with_fallback(call)
+        if resp and resp.text:
+            try:
                 data = json.loads(resp.text)
                 return {
                     "score": max(0.0, min(100.0, float(data.get("score", 50)))),
                     "summary": str(data.get("summary", "")),
                     "category": str(data.get("category", "")),
                 }
-        except Exception as e:
-            logger.warning("Gemini failed to score lead: %s. Falling back to Groq.", e)
-            return await groq_engine.qualify_lead(name, description, keyword)
+            except Exception:
+                pass
 
-        return {"score": 50.0, "summary": "", "category": ""}
+        # Fallback to Groq
+        logger.info("Gemini lead scoring failed; falling back to Groq.")
+        return await groq_engine.qualify_lead(name, description, keyword)
 
     async def extract_structured(self, text: str) -> dict:
         """Extract name/email/phone/address from raw text."""
         if not self.available:
             return await groq_engine.extract_structured(text)
-            
+
         if not text or len(text.strip()) < 10:
             return {}
 
@@ -124,8 +157,8 @@ class GeminiEngine:
             '"name" (string or null), "email" (string or null), "phone" (string or null), "address" (string or null), "website" (string or null).'
         )
 
-        try:
-            resp = await self.client.aio.models.generate_content(
+        async def call(client):
+            return await client.aio.models.generate_content(
                 model=settings.GEMINI_MODEL,
                 contents=prompt,
                 config=types.GenerateContentConfig(
@@ -133,12 +166,16 @@ class GeminiEngine:
                     response_mime_type="application/json",
                 ),
             )
-            if resp.text:
-                return json.loads(resp.text)
-        except Exception as e:
-            logger.warning("Gemini failed to extract info: %s. Falling back to Groq.", e)
-            return await groq_engine.extract_structured(text)
 
-        return {}
+        resp = await self._execute_with_fallback(call)
+        if resp and resp.text:
+            try:
+                return json.loads(resp.text)
+            except Exception:
+                pass
+
+        # Fallback to Groq
+        logger.info("Gemini extraction failed; falling back to Groq.")
+        return await groq_engine.extract_structured(text)
 
 gemini_engine = GeminiEngine()
