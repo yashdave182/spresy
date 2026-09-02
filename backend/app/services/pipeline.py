@@ -15,6 +15,7 @@ from ..scrapers.indiamart import IndiaMartScraper
 from ..scrapers.justdial import JustDialScraper
 from ..scrapers.mca import MCAScraper
 from ..scrapers.opencorporates import OpenCorporatesScraper
+from ..scrapers.serpapi import SerpApiScraper
 from ..scrapers.startpage import StartpageScraper
 from ..scrapers.sulekha import SulekhaScraper
 from ..scrapers.tradeindia import TradeIndiaScraper
@@ -44,6 +45,7 @@ TIER2_SOURCES = {
     "duckduckgo": DuckDuckGoScraper,
     "bing": BingScraper,
     "startpage": StartpageScraper,
+    "serpapi": SerpApiScraper,
     "google_maps": GoogleMapsScraper,
     "bbb": BBBScraper,
     "yelp": YelpScraper,
@@ -67,14 +69,24 @@ DEFAULT_SOURCES = [
     "zaubacorp", "bbb", "yelp", "yellowpages", "website", # directories + crawler
 ]
 
-# On Vercel: only sources that work reliably without proxies/Playwright
-# Removed: MCA(403), OpenCorporates(401), Yelp scraper(403), YellowPages(404),
-#           ZaubaCorp(403), BBB(US-only), DuckDuckGo(202 blocked),
-#           IndiaMART (returns products not businesses), JustDial(403),
-#           TradeIndia (company directory 404s on long-tail searches)
+# On Render: sources that work from a US-based Docker container.
+# Removed everything that 403s/404s from Render's IP:
+#   Startpage (CAPTCHA-blocked), DuckDuckGo (blocked), JustDial (403),
+#   Yelp scraper (403), YellowPages (403), ZaubaCorp (403), MCA (403),
+#   OpenCorporates (401), IndiaMART directory (404), TradeIndia (404)
+RENDER_DEFAULT_SOURCES = [
+    "serpapi",         # Google Search via SerpAPI — geo-targeted, no captcha
+    "google_maps",    # Google Maps via SerpAPI — returns real local businesses
+    "sulekha",        # India local services directory (200 OK)
+    "website",        # Playwright crawler — processes discovered URLs
+    "yelp_fusion",    # Official Yelp API (if YELP_API_KEY is set)
+    "google_places",  # Official Google Places API (if GOOGLE_PLACES_KEY is set)
+]
+
+# On Vercel: only sources that work without Playwright
 VERCEL_DEFAULT_SOURCES = [
-    "bing",           # Reliable search — now yields leads directly
-    "startpage",      # Privacy-Google proxy — now yields leads directly
+    "bing",           # Reliable search — yields leads directly on Vercel
+    "startpage",      # Privacy-Google proxy — yields leads directly on Vercel
     "sulekha",        # India local services directory
     "yelp_fusion",    # Official Yelp API (if YELP_API_KEY is set)
     "google_places",  # Official Google Places API (if GOOGLE_PLACES_KEY is set)
@@ -136,7 +148,8 @@ class ScrapePipeline:
         # On Vercel, use a trimmed source list — skip scrapers that always 403/401/404
         if os.environ.get("VERCEL"):
             return [SOURCES[s] for s in VERCEL_DEFAULT_SOURCES if s in SOURCES]
-        return [SOURCES[s] for s in DEFAULT_SOURCES]
+        # On Render / cloud Docker, use the Render-optimized list
+        return [SOURCES[s] for s in RENDER_DEFAULT_SOURCES if s in SOURCES]
 
 
     async def run(self) -> dict:
