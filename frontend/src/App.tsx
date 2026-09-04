@@ -729,7 +729,7 @@ function CampaignFlow({ jobId, onClose }: { jobId: string; onClose: () => void }
     setUploading(true)
     setError(null)
     try {
-      const results = []
+      const results: { file_path: string; filename: string; preview: string }[] = []
       for (const file of Array.from(files)) {
         const fd = new FormData()
         fd.append('file', file)
@@ -871,7 +871,7 @@ function CampaignFlow({ jobId, onClose }: { jobId: string; onClose: () => void }
 
   const approvedCount = messages.filter(m => m.status === 'approved').length
   const generatedCount = messages.filter(m => m.status === 'generated').length
-  const sentCount = messages.filter(m => m.status === 'sent').length
+  // const sentCount = messages.filter(m => m.status === 'sent').length
   const skippedCount = messages.filter(m => m.status === 'skipped').length
 
   return (
