@@ -471,6 +471,7 @@ function ScraperApp({ onBack }: { onBack: () => void }) {
   const [jobId, setJobId] = useState<string | null>(null)
   const [results, setResults] = useState<any[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [showCampaign, setShowCampaign] = useState(false)
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -480,6 +481,7 @@ function ScraperApp({ onBack }: { onBack: () => void }) {
     setError(null)
     setResults([])
     setJobId(null)
+    setShowCampaign(false)
 
     try {
       const response = await fetch(`${API_BASE.replace(/\/$/, '')}/api/scrape`, {
@@ -513,23 +515,19 @@ function ScraperApp({ onBack }: { onBack: () => void }) {
 
       const data = await response.json()
 
-      // Update progress message for the user
       if (data.progress?.message) {
         setLoadingStage(data.progress.message)
       } else if (data.status === 'running') {
         setLoadingStage('Searching for leads...')
       }
 
-      // Show partial leads immediately as they arrive
       if (data.leads && data.leads.length > 0) {
         setResults(data.leads)
       }
 
-      // Keep polling until the job is fully done
       if (data.status === 'running' || data.status === 'pending' || data.status === 'partial') {
         setTimeout(() => pollJob(id), 3000)
       } else {
-        // Job is completed or failed — stop polling
         setLoading(false)
         if (data.leads && data.leads.length === 0) {
           setError('No leads found for this search. Try a different keyword or location.')
@@ -619,12 +617,23 @@ function ScraperApp({ onBack }: { onBack: () => void }) {
                 Discovered Leads {results.length > 0 && `(${results.length})`}
                 {loading && results.length > 0 && <span style={{ marginLeft: '8px', fontSize: '12px', color: 'var(--accent)', fontWeight: 400 }}>finding more...</span>}
               </span>
-              {jobId && !loading && (
-                <a href={`${API_BASE.replace(/\/$/, '')}/api/jobs/${jobId}/csv`} className="download-link" download>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true" style={{ marginRight: '4px' }}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-                  Download CSV
-                </a>
-              )}
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                {jobId && !loading && (
+                  <a href={`${API_BASE.replace(/\/$/, '')}/api/jobs/${jobId}/csv`} className="download-link" download>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true" style={{ marginRight: '4px' }}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                    Download CSV
+                  </a>
+                )}
+                {results.length > 0 && !loading && jobId && (
+                  <button
+                    className="btn-primary"
+                    style={{ padding: '8px 18px', fontSize: '13px', background: 'linear-gradient(135deg, #7c3aed, #a855f7)', borderRadius: '8px' }}
+                    onClick={() => setShowCampaign(true)}
+                  >
+                    🚀 Start Outreach Campaign
+                  </button>
+                )}
+              </div>
             </div>
             <div className="results-table">
               <div className="results-row header" style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr 1fr 1fr 1fr 80px' }}>
@@ -663,6 +672,487 @@ function ScraperApp({ onBack }: { onBack: () => void }) {
             </div>
           </div>
         )}
+      </div>
+
+      {showCampaign && jobId && (
+        <CampaignFlow
+          jobId={jobId}
+          onClose={() => setShowCampaign(false)}
+        />
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// CampaignFlow — 3-step outreach automation modal
+// ---------------------------------------------------------------------------
+
+type CampaignStep = 'setup' | 'review' | 'send'
+
+function CampaignFlow({ jobId, onClose }: { jobId: string; onClose: () => void }) {
+  const [step, setStep] = useState<CampaignStep>('setup')
+  const [campaignId, setCampaignId] = useState<string | null>(null)
+  const [campaignStatus, setCampaignStatus] = useState('')
+  const [messages, setMessages] = useState<any[]>([])
+  const [batchResult, setBatchResult] = useState<any>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // Setup form state
+  const [smtpEmail, setSmtpEmail] = useState('')
+  const [smtpPassword, setSmtpPassword] = useState('')
+  const [smtpHost, setSmtpHost] = useState('smtp.gmail.com')
+  const [smtpPort, setSmtpPort] = useState(587)
+  const [senderName, setSenderName] = useState('')
+  const [physicalAddress, setPhysicalAddress] = useState('')
+  const [prompt, setPrompt] = useState('')
+  const [uploadedFiles, setUploadedFiles] = useState<{ file_path: string; filename: string; preview: string }[]>([])
+  const [uploading, setUploading] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editSubject, setEditSubject] = useState('')
+  const [editBody, setEditBody] = useState('')
+
+  // Auto-detect SMTP host from email
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value
+    setSmtpEmail(val)
+    if (val.includes('@gmail.com')) { setSmtpHost('smtp.gmail.com'); setSmtpPort(587) }
+    else if (val.includes('@outlook.com') || val.includes('@hotmail.com')) { setSmtpHost('smtp-mail.outlook.com'); setSmtpPort(587) }
+    else if (val.includes('@yahoo.com')) { setSmtpHost('smtp.mail.yahoo.com'); setSmtpPort(587) }
+    else if (val.includes('@zoho.com')) { setSmtpHost('smtp.zoho.com'); setSmtpPort(465) }
+  }
+
+  const handleFileUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return
+    setUploading(true)
+    setError(null)
+    try {
+      const results = []
+      for (const file of Array.from(files)) {
+        const fd = new FormData()
+        fd.append('file', file)
+        const resp = await fetch(`${API_BASE.replace(/\/$/, '')}/api/upload`, { method: 'POST', body: fd })
+        if (!resp.ok) throw new Error('Upload failed')
+        const data = await resp.json()
+        results.push({ file_path: data.file_path, filename: data.filename, preview: data.extracted_text_preview })
+      }
+      setUploadedFiles(prev => [...prev, ...results])
+    } catch (err) {
+      setError('File upload failed. Please try again.')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const handleCreateCampaign = async () => {
+    if (!prompt.trim()) { setError('Please enter outreach instructions.'); return }
+    if (!smtpEmail || !smtpPassword) { setError('Please enter your email and app password.'); return }
+    setError(null)
+    setBusy(true)
+    try {
+      // Save SMTP credentials
+      const smtpFd = new FormData()
+      smtpFd.append('email', smtpEmail)
+      smtpFd.append('smtp_host', smtpHost)
+      smtpFd.append('smtp_port', String(smtpPort))
+      smtpFd.append('password', smtpPassword)
+      smtpFd.append('sender_name', senderName)
+      const smtpResp = await fetch(`${API_BASE.replace(/\/$/, '')}/api/smtp`, { method: 'POST', body: smtpFd })
+      if (!smtpResp.ok) throw new Error('Failed to save SMTP credentials')
+      const smtpData = await smtpResp.json()
+
+      // Create campaign
+      const campFd = new FormData()
+      campFd.append('job_id', jobId)
+      campFd.append('prompt', prompt)
+      campFd.append('smtp_credential_id', smtpData.id)
+      campFd.append('sender_name', senderName)
+      campFd.append('physical_address', physicalAddress || 'India')
+      campFd.append('doc_file_paths', uploadedFiles.map(f => f.file_path).join(','))
+      campFd.append('doc_filenames', uploadedFiles.map(f => f.filename).join(','))
+      const campResp = await fetch(`${API_BASE.replace(/\/$/, '')}/api/campaigns`, { method: 'POST', body: campFd })
+      if (!campResp.ok) throw new Error('Failed to create campaign')
+      const campData = await campResp.json()
+      setCampaignId(campData.id)
+
+      // Start message generation
+      await fetch(`${API_BASE.replace(/\/$/, '')}/api/campaigns/${campData.id}/generate`, { method: 'POST' })
+      setCampaignStatus('generating')
+      setStep('review')
+      startPolling(campData.id)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create campaign')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const startPolling = (id: string) => {
+    if (pollingRef.current) clearInterval(pollingRef.current)
+    pollingRef.current = setInterval(async () => {
+      const resp = await fetch(`${API_BASE.replace(/\/$/, '')}/api/campaigns/${id}`)
+      if (!resp.ok) return
+      const data = await resp.json()
+      setCampaignStatus(data.status)
+      if (data.status === 'review' || data.status === 'running' || data.status === 'completed') {
+        clearInterval(pollingRef.current!)
+        // Load messages
+        const msgResp = await fetch(`${API_BASE.replace(/\/$/, '')}/api/campaigns/${id}/messages`)
+        if (msgResp.ok) setMessages(await msgResp.json())
+      }
+    }, 3000)
+  }
+
+  const handleApproveAll = async () => {
+    if (!campaignId) return
+    setBusy(true)
+    try {
+      await fetch(`${API_BASE.replace(/\/$/, '')}/api/campaigns/${campaignId}/approve-all`, { method: 'POST' })
+      setMessages(prev => prev.map(m => m.status === 'generated' ? { ...m, status: 'approved' } : m))
+      setCampaignStatus('running')
+      setStep('send')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleApproveOne = async (id: string) => {
+    await fetch(`${API_BASE.replace(/\/$/, '')}/api/outreach/${id}/approve`, { method: 'POST' })
+    setMessages(prev => prev.map(m => m.id === id ? { ...m, status: 'approved' } : m))
+  }
+
+  const handleEditSave = async (id: string) => {
+    const fd = new FormData()
+    fd.append('subject', editSubject)
+    fd.append('message', editBody)
+    await fetch(`${API_BASE.replace(/\/$/, '')}/api/outreach/${id}`, { method: 'PUT', body: fd })
+    setMessages(prev => prev.map(m => m.id === id ? { ...m, subject: editSubject, message: editBody, user_edited: true } : m))
+    setEditingId(null)
+  }
+
+  const handleSendBatch = async () => {
+    if (!campaignId) return
+    setBusy(true)
+    try {
+      const resp = await fetch(`${API_BASE.replace(/\/$/, '')}/api/campaigns/${campaignId}/send-batch`, { method: 'POST' })
+      const data = await resp.json()
+      setBatchResult(data)
+      // Refresh messages
+      const msgResp = await fetch(`${API_BASE.replace(/\/$/, '')}/api/campaigns/${campaignId}/messages`)
+      if (msgResp.ok) setMessages(await msgResp.json())
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handlePause = async () => {
+    if (!campaignId) return
+    await fetch(`${API_BASE.replace(/\/$/, '')}/api/campaigns/${campaignId}/pause`, { method: 'POST' })
+    setCampaignStatus('paused')
+  }
+
+  useEffect(() => () => { if (pollingRef.current) clearInterval(pollingRef.current) }, [])
+
+  const statusBadge = (s: string) => {
+    const colors: Record<string, string> = {
+      generated: '#7c3aed', approved: '#2563eb', claimed: '#d97706',
+      sent: '#16a34a', failed: '#dc2626', bounced: '#9a3412',
+      skipped: '#6b7280', pending: '#6b7280',
+    }
+    return (
+      <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600,
+        background: (colors[s] || '#6b7280') + '22', color: colors[s] || '#6b7280', textTransform: 'uppercase' }}>
+        {s}
+      </span>
+    )
+  }
+
+  const approvedCount = messages.filter(m => m.status === 'approved').length
+  const generatedCount = messages.filter(m => m.status === 'generated').length
+  const sentCount = messages.filter(m => m.status === 'sent').length
+  const skippedCount = messages.filter(m => m.status === 'skipped').length
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 1000,
+      background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)',
+      display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+      padding: '20px', overflowY: 'auto',
+    }}>
+      <div style={{
+        background: 'var(--surface)', borderRadius: '16px', border: '1px solid var(--border)',
+        width: '100%', maxWidth: '860px', maxHeight: '90vh', overflow: 'hidden',
+        display: 'flex', flexDirection: 'column', marginTop: '20px',
+        boxShadow: '0 25px 80px rgba(0,0,0,0.5)',
+      }}>
+        {/* Header */}
+        <div style={{ padding: '24px 28px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700 }}>
+              {step === 'setup' ? '🚀 Create Outreach Campaign' : step === 'review' ? '✍️ Review Messages' : '📤 Send Campaign'}
+            </h2>
+            <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
+              {(['setup', 'review', 'send'] as CampaignStep[]).map((s, i) => (
+                <div key={s} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div style={{ width: '24px', height: '24px', borderRadius: '50%', fontSize: '12px', fontWeight: 700,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: step === s ? 'var(--accent)' : ((['setup', 'review', 'send'].indexOf(step) > i) ? '#16a34a' : 'var(--border)'),
+                    color: step === s || (['setup', 'review', 'send'].indexOf(step) > i) ? 'white' : 'var(--text-muted)',
+                  }}>{i + 1}</div>
+                  <span style={{ fontSize: '12px', color: step === s ? 'var(--text)' : 'var(--text-muted)', textTransform: 'capitalize' }}>{s}</span>
+                  {i < 2 && <span style={{ color: 'var(--border)', margin: '0 4px' }}>›</span>}
+                </div>
+              ))}
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '20px', lineHeight: 1 }}>✕</button>
+        </div>
+
+        {/* Body */}
+        <div style={{ overflowY: 'auto', padding: '28px', flexGrow: 1 }}>
+          {error && <div className="error-toast" style={{ marginBottom: '20px' }}>{error}</div>}
+
+          {/* ---- STEP 1: SETUP ---- */}
+          {step === 'setup' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+
+              {/* Email Settings */}
+              <section>
+                <h3 style={{ margin: '0 0 16px', fontSize: '15px', fontWeight: 600, color: 'var(--accent)' }}>📧 Email Settings</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                  <div>
+                    <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>Your Email *</label>
+                    <input className="field-input" type="email" placeholder="you@gmail.com" value={smtpEmail} onChange={handleEmailChange} style={{ width: '100%' }} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
+                      App Password * <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', fontSize: '11px' }}>Get Gmail App Password →</a>
+                    </label>
+                    <input className="field-input" type="password" placeholder="xxxx xxxx xxxx xxxx" value={smtpPassword} onChange={e => setSmtpPassword(e.target.value)} style={{ width: '100%' }} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>Display Name</label>
+                    <input className="field-input" type="text" placeholder="Yash Dave" value={senderName} onChange={e => setSenderName(e.target.value)} style={{ width: '100%' }} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>Physical Address <span style={{ fontSize: '10px' }}>(CAN-SPAM required)</span></label>
+                    <input className="field-input" type="text" placeholder="123 Main St, Ahmedabad, India" value={physicalAddress} onChange={e => setPhysicalAddress(e.target.value)} style={{ width: '100%' }} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>SMTP Host</label>
+                    <input className="field-input" type="text" value={smtpHost} onChange={e => setSmtpHost(e.target.value)} style={{ width: '100%' }} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>SMTP Port</label>
+                    <input className="field-input" type="number" value={smtpPort} onChange={e => setSmtpPort(Number(e.target.value))} style={{ width: '100%' }} />
+                  </div>
+                </div>
+              </section>
+
+              {/* Document Upload */}
+              <section>
+                <h3 style={{ margin: '0 0 16px', fontSize: '15px', fontWeight: 600, color: 'var(--accent)' }}>📎 Upload Documents</h3>
+                <div
+                  style={{ border: '2px dashed var(--border)', borderRadius: '12px', padding: '32px', textAlign: 'center', cursor: 'pointer', transition: 'border-color 0.2s', position: 'relative' }}
+                  onDragOver={e => { e.preventDefault(); (e.currentTarget as HTMLElement).style.borderColor = 'var(--accent)' }}
+                  onDragLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)' }}
+                  onDrop={async e => { e.preventDefault(); (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'; await handleFileUpload(e.dataTransfer.files) }}
+                  onClick={() => document.getElementById('doc-upload-input')?.click()}
+                >
+                  <input id="doc-upload-input" type="file" multiple accept=".pdf,.docx,.doc,.txt,.md,.png,.jpg,.jpeg" style={{ display: 'none' }} onChange={e => handleFileUpload(e.target.files)} />
+                  {uploading ? (
+                    <><span className="spinner" style={{ marginRight: '8px' }}></span>Uploading...</>
+                  ) : (
+                    <>
+                      <div style={{ fontSize: '32px', marginBottom: '8px' }}>📄</div>
+                      <div style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Drop files here or click to browse</div>
+                      <div style={{ color: 'var(--text-muted)', fontSize: '12px', marginTop: '4px' }}>PDF, DOCX, TXT, images — resume, portfolio, pitch deck</div>
+                    </>
+                  )}
+                </div>
+                {uploadedFiles.length > 0 && (
+                  <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {uploadedFiles.map((f, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', background: 'var(--surface-alt)', borderRadius: '8px', fontSize: '13px' }}>
+                        <span>📄</span>
+                        <span style={{ fontWeight: 500 }}>{f.filename}</span>
+                        <span style={{ color: 'var(--text-muted)', fontSize: '11px', flexGrow: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.preview}</span>
+                        <button onClick={() => setUploadedFiles(prev => prev.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '14px' }}>✕</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              {/* Prompt */}
+              <section>
+                <h3 style={{ margin: '0 0 16px', fontSize: '15px', fontWeight: 600, color: 'var(--accent)' }}>✨ Outreach Instructions</h3>
+                <textarea
+                  className="field-input"
+                  rows={5}
+                  style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit' }}
+                  placeholder={`Example: "I'm a full-stack developer with 3 years of experience in React and Node.js. I'm looking for a junior/mid-level developer role. Please write a personalized cold email applying to each company, referencing my resume, and asking about open positions."`}
+                  value={prompt}
+                  onChange={e => setPrompt(e.target.value)}
+                />
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '6px' }}>
+                  AI will read your documents and use these instructions to craft a unique message for each lead.
+                </div>
+              </section>
+            </div>
+          )}
+
+          {/* ---- STEP 2: REVIEW ---- */}
+          {step === 'review' && (
+            <div>
+              {campaignStatus === 'generating' && (
+                <div style={{ textAlign: 'center', padding: '40px 0' }}>
+                  <span className="spinner" style={{ width: '32px', height: '32px', borderWidth: '3px', marginBottom: '16px', display: 'inline-block' }}></span>
+                  <div style={{ fontSize: '16px', fontWeight: 500 }}>AI is writing personalized messages...</div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '8px' }}>Validating emails, checking suppression list, and crafting unique outreach for each lead.</div>
+                </div>
+              )}
+              {messages.length > 0 && (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
+                    <div style={{ display: 'flex', gap: '16px', fontSize: '13px' }}>
+                      <span>✅ <strong>{generatedCount}</strong> ready</span>
+                      <span>⏭️ <strong>{skippedCount}</strong> skipped</span>
+                      <span>🔵 <strong>{approvedCount}</strong> approved</span>
+                    </div>
+                    {generatedCount > 0 && (
+                      <button className="btn-primary" style={{ padding: '8px 20px', fontSize: '13px' }} onClick={handleApproveAll} disabled={busy}>
+                        {busy ? 'Approving...' : `Approve All (${generatedCount}) & Continue →`}
+                      </button>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {messages.map(m => (
+                      <div key={m.id} style={{ border: '1px solid var(--border)', borderRadius: '10px', overflow: 'hidden' }}>
+                        <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '12px', background: 'var(--surface-alt)' }}>
+                          <div style={{ flexGrow: 1 }}>
+                            <span style={{ fontWeight: 600, fontSize: '14px' }}>{m.lead_name || 'Unknown'}</span>
+                            <span style={{ color: 'var(--text-muted)', fontSize: '12px', marginLeft: '10px' }}>{m.to_email || 'no email'}</span>
+                            {m.user_edited && <span style={{ marginLeft: '8px', fontSize: '10px', color: '#a855f7', fontWeight: 600 }}>EDITED</span>}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            {statusBadge(m.status)}
+                            {m.status === 'generated' && (
+                              <>
+                                <button onClick={() => { setEditingId(m.id); setEditSubject(m.subject || ''); setEditBody(m.message || '') }}
+                                  style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '6px', padding: '3px 10px', cursor: 'pointer', fontSize: '12px', color: 'var(--text-muted)' }}>
+                                  Edit
+                                </button>
+                                <button onClick={() => handleApproveOne(m.id)}
+                                  style={{ background: 'var(--accent)', border: 'none', borderRadius: '6px', padding: '3px 10px', cursor: 'pointer', fontSize: '12px', color: 'white', fontWeight: 600 }}>
+                                  Approve
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                        {m.status !== 'skipped' && (
+                          <div style={{ padding: '12px 16px' }}>
+                            {editingId === m.id ? (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                <input className="field-input" value={editSubject} onChange={e => setEditSubject(e.target.value)} placeholder="Subject" style={{ fontSize: '13px' }} />
+                                <textarea className="field-input" rows={6} value={editBody} onChange={e => setEditBody(e.target.value)} style={{ fontSize: '13px', resize: 'vertical', fontFamily: 'inherit' }} />
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                  <button className="btn-primary" style={{ padding: '6px 16px', fontSize: '12px' }} onClick={() => handleEditSave(m.id)}>Save</button>
+                                  <button onClick={() => setEditingId(null)} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 16px', cursor: 'pointer', fontSize: '12px', color: 'var(--text-muted)' }}>Cancel</button>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '6px' }}>Subject: <strong>{m.subject || '—'}</strong></div>
+                                <div style={{ fontSize: '13px', whiteSpace: 'pre-wrap', color: 'var(--text)', lineHeight: 1.6 }}>{m.message || m.skip_reason || '—'}</div>
+                              </>
+                            )}
+                          </div>
+                        )}
+                        {m.status === 'skipped' && (
+                          <div style={{ padding: '10px 16px', fontSize: '12px', color: 'var(--text-muted)' }}>
+                            Skipped: {m.skip_reason || 'unknown reason'}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* ---- STEP 3: SEND ---- */}
+          {step === 'send' && (
+            <div>
+              {/* Stats */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '28px' }}>
+                {[
+                  { label: 'Sent', value: messages.filter(m => m.status === 'sent').length, color: '#16a34a' },
+                  { label: 'Pending', value: messages.filter(m => m.status === 'approved').length, color: '#2563eb' },
+                  { label: 'Failed', value: messages.filter(m => m.status === 'failed').length, color: '#dc2626' },
+                  { label: 'Daily Quota Left', value: batchResult?.daily_remaining ?? '—', color: 'var(--accent)' },
+                ].map(stat => (
+                  <div key={stat.label} style={{ padding: '16px', background: 'var(--surface-alt)', borderRadius: '10px', border: '1px solid var(--border)', textAlign: 'center' }}>
+                    <div style={{ fontSize: '28px', fontWeight: 700, color: stat.color }}>{stat.value}</div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>{stat.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              {batchResult && (
+                <div style={{ padding: '12px 16px', borderRadius: '8px', background: '#16a34a22', border: '1px solid #16a34a44', marginBottom: '20px', fontSize: '13px' }}>
+                  Last batch: <strong>{batchResult.sent} sent</strong>, {batchResult.failed} failed, {batchResult.bounced} bounced, {batchResult.remaining} remaining
+                  {batchResult.limit_reached && <span style={{ color: '#dc2626', marginLeft: '8px' }}>⚠️ Daily limit reached</span>}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                <button
+                  className="btn-primary"
+                  style={{ padding: '12px 28px', fontSize: '15px', background: 'linear-gradient(135deg, #16a34a, #15803d)' }}
+                  onClick={handleSendBatch}
+                  disabled={busy || messages.filter(m => m.status === 'approved').length === 0}
+                >
+                  {busy ? <><span className="spinner" style={{ marginRight: '8px', borderTopColor: 'white' }}></span>Sending...</> : '📤 Send Next Batch (5)'}
+                </button>
+                <button
+                  onClick={handlePause}
+                  style={{ padding: '12px 24px', fontSize: '14px', background: 'none', border: '1px solid var(--border)', borderRadius: '10px', cursor: 'pointer', color: 'var(--text-muted)' }}
+                >
+                  ⏸ Pause
+                </button>
+              </div>
+
+              {/* Message list */}
+              <div style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {messages.filter(m => m.status !== 'skipped').map(m => (
+                  <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 14px', background: 'var(--surface-alt)', borderRadius: '8px', fontSize: '13px' }}>
+                    <span style={{ fontWeight: 500, flexGrow: 1 }}>{m.lead_name}</span>
+                    <span style={{ color: 'var(--text-muted)' }}>{m.to_email}</span>
+                    {statusBadge(m.status)}
+                    {m.status === 'failed' && (
+                      <button onClick={() => handleApproveOne(m.id)} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '6px', padding: '2px 8px', cursor: 'pointer', fontSize: '11px', color: 'var(--text-muted)' }}>Retry</button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: '16px 28px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+          <button onClick={onClose} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 18px', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '13px' }}>Close</button>
+          {step === 'setup' && (
+            <button className="btn-primary" onClick={handleCreateCampaign} disabled={busy || !prompt.trim() || !smtpEmail || !smtpPassword}>
+              {busy ? <><span className="spinner" style={{ marginRight: '8px' }}></span>Creating...</> : 'Generate Messages →'}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   )

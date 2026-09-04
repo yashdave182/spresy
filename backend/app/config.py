@@ -20,6 +20,11 @@ class Settings(BaseSettings):
     # Search engines
     SERPAPI_KEY: str = ""  # optional: for Google Maps via SerpAPI
 
+    # Outreach system
+    ENCRYPTION_KEY: str = ""  # Fernet key for encrypting SMTP passwords (generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
+    UPLOAD_DIR: str = "uploads"   # where uploaded docs are stored
+    OUTREACH_DAILY_LIMIT: int = 25  # default daily send limit per credential
+
     # ---- Tier 1: Official APIs ----
     GOOGLE_PLACES_API_KEY: str = ""   # Google Places API (Text Search + Details)
     YELP_FUSION_API_KEY: str = ""     # Yelp Fusion API (free tier)
