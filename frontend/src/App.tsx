@@ -780,22 +780,15 @@ function CampaignFlow({ jobId, onClose }: { jobId: string; onClose: () => void }
   }
 
   const handleCreateCampaign = async () => {
-    if (channel === 'whatsapp') {
-      if (!prompt.trim()) { setError('Please enter a WhatsApp message template.'); return }
-      if (whatsappLeads.length === 0) { setError('No leads with phone numbers found for this job.'); return }
-      setStep('send')
-      return
-    }
-
-    if (!prompt.trim()) { setError('Please enter outreach instructions.'); return }
-    if (!smtpEmail || !smtpPassword) { setError('Please enter your email and app password.'); return }
+    if (!prompt.trim()) { setError('Please enter outreach instructions or template.'); return }
+    if (channel === 'email' && (!smtpEmail || !smtpPassword)) { setError('Please enter your email and app password.'); return }
     setError(null)
     setBusy(true)
     try {
       let finalCredId = smtpCredentialId
 
       // If we don't have a saved credential selected, or they typed a new password, save it
-      if (!finalCredId || (smtpPassword && smtpPassword !== 'saved_password_placeholder')) {
+      if (channel === 'email' && (!finalCredId || (smtpPassword && smtpPassword !== 'saved_password_placeholder'))) {
         const smtpFd = new FormData()
         smtpFd.append('email', smtpEmail)
         smtpFd.append('smtp_host', smtpHost)
@@ -816,6 +809,7 @@ function CampaignFlow({ jobId, onClose }: { jobId: string; onClose: () => void }
       campFd.append('smtp_credential_id', finalCredId || '')
       campFd.append('sender_name', senderName)
       campFd.append('physical_address', physicalAddress || 'India')
+      campFd.append('channel', channel)
       campFd.append('doc_file_paths', uploadedFiles.map(f => f.file_path).join(','))
       campFd.append('doc_filenames', uploadedFiles.map(f => f.filename).join(','))
       const campResp = await fetch(`${API_BASE.replace(/\/$/, '')}/api/campaigns`, { method: 'POST', body: campFd })
@@ -1046,30 +1040,25 @@ function CampaignFlow({ jobId, onClose }: { jobId: string; onClose: () => void }
               {/* Prompt */}
               <section>
                 <h3 style={{ margin: '0 0 16px', fontSize: '15px', fontWeight: 600, color: channel === 'whatsapp' ? '#25D366' : 'var(--accent)' }}>
-                  {channel === 'whatsapp' ? '💬 WhatsApp Message Template' : '✨ Outreach Instructions'}
+                  {channel === 'whatsapp' ? '💬 WhatsApp Message Instructions' : '✨ Outreach Instructions'}
                 </h3>
-                {channel === 'whatsapp' && (
-                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px' }}>
-                    Available variables: <code style={{ background: 'var(--surface-alt)', padding: '2px 4px', borderRadius: '4px' }}>{'{name}'}</code>, <code style={{ background: 'var(--surface-alt)', padding: '2px 4px', borderRadius: '4px' }}>{'{company}'}</code>, <code style={{ background: 'var(--surface-alt)', padding: '2px 4px', borderRadius: '4px' }}>{'{city}'}</code>
-                  </div>
-                )}
                 <textarea
                   className="field-input"
                   rows={5}
                   style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit' }}
-                  placeholder={channel === 'whatsapp' ? `Hi {name},\n\nI noticed {company} in {city} and wanted to reach out regarding...` : `Example: "I'm a full-stack developer..."`}
+                  placeholder={channel === 'whatsapp' ? `Example: "Write a short, friendly WhatsApp message introducing our lead generation services. Mention their city and industry. Keep it under 2 sentences and use emojis."` : `Example: "I'm a full-stack developer..."`}
                   value={prompt}
                   onChange={e => setPrompt(e.target.value)}
                 />
                 <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '6px' }}>
-                  {channel === 'whatsapp' ? 'We will pre-fill this message in WhatsApp Web for each lead with a phone number.' : 'AI will read your documents and use these instructions to craft a unique message for each lead.'}
+                  AI will read your documents and use these instructions to craft a unique message for each lead.
                 </div>
               </section>
             </div>
           )}
 
           {/* ---- STEP 2: REVIEW ---- */}
-          {step === 'review' && channel === 'email' && (
+          {step === 'review' && (
             <div>
               {campaignStatus === 'generating' && (
                 <div style={{ textAlign: 'center', padding: '40px 0' }}>
@@ -1121,7 +1110,9 @@ function CampaignFlow({ jobId, onClose }: { jobId: string; onClose: () => void }
                           <div style={{ padding: '12px 16px' }}>
                             {editingId === m.id ? (
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                <input className="field-input" value={editSubject} onChange={e => setEditSubject(e.target.value)} placeholder="Subject" style={{ fontSize: '13px' }} />
+                                {channel === 'email' && (
+                                  <input className="field-input" value={editSubject} onChange={e => setEditSubject(e.target.value)} placeholder="Subject" style={{ fontSize: '13px' }} />
+                                )}
                                 <textarea className="field-input" rows={6} value={editBody} onChange={e => setEditBody(e.target.value)} style={{ fontSize: '13px', resize: 'vertical', fontFamily: 'inherit' }} />
                                 <div style={{ display: 'flex', gap: '8px' }}>
                                   <button className="btn-primary" style={{ padding: '6px 16px', fontSize: '12px' }} onClick={() => handleEditSave(m.id)}>Save</button>
@@ -1130,7 +1121,9 @@ function CampaignFlow({ jobId, onClose }: { jobId: string; onClose: () => void }
                               </div>
                             ) : (
                               <>
-                                <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '6px' }}>Subject: <strong>{m.subject || '—'}</strong></div>
+                                {channel === 'email' && (
+                                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '6px' }}>Subject: <strong>{m.subject || '—'}</strong></div>
+                                )}
                                 <div style={{ fontSize: '13px', whiteSpace: 'pre-wrap', color: 'var(--text)', lineHeight: 1.6 }}>{m.message || m.skip_reason || '—'}</div>
                               </>
                             )}
@@ -1153,25 +1146,26 @@ function CampaignFlow({ jobId, onClose }: { jobId: string; onClose: () => void }
           {step === 'send' && channel === 'whatsapp' && (
             <div style={{ textAlign: 'center', padding: '20px 0' }}>
               <div style={{ fontSize: '18px', fontWeight: 600, marginBottom: '24px' }}>
-                WhatsApp Power Dialer ({whatsappIndex + 1} of {whatsappLeads.length})
+                WhatsApp Power Dialer ({whatsappIndex + 1} of {messages.filter(m => m.status === 'approved' || m.status === 'sent').length})
               </div>
               
-              {whatsappLeads.length > 0 && whatsappIndex < whatsappLeads.length ? (
-                (() => {
-                  const lead = whatsappLeads[whatsappIndex];
-                  const rawPhone = lead.phone.replace(/[^0-9+]/g, '');
-                  let parsedMessage = prompt
-                    .replace(/\{name\}/gi, lead.name || 'there')
-                    .replace(/\{company\}/gi, lead.name || 'your company')
-                    .replace(/\{city\}/gi, lead.city || 'your city');
+              {(() => {
+                const dialerMessages = messages.filter(m => m.status === 'approved' || m.status === 'sent');
+                if (dialerMessages.length > 0 && whatsappIndex < dialerMessages.length) {
+                  const m = dialerMessages[whatsappIndex];
+                  const rawPhone = (m.to_phone || '').replace(/[^0-9+]/g, '');
+                  const parsedMessage = m.message || '';
                   
                   return (
                     <div style={{ background: 'var(--surface-alt)', border: '1px solid var(--border)', borderRadius: '12px', padding: '32px', maxWidth: '500px', margin: '0 auto', textAlign: 'left' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
                         <div>
-                          <div style={{ fontWeight: 600, fontSize: '16px' }}>{lead.name}</div>
-                          <div style={{ color: 'var(--text-muted)', fontSize: '14px', marginTop: '4px' }}>📞 {lead.phone}</div>
+                          <div style={{ fontWeight: 600, fontSize: '16px' }}>{m.lead_name}</div>
+                          <div style={{ color: 'var(--text-muted)', fontSize: '14px', marginTop: '4px' }}>📞 {m.to_phone}</div>
                         </div>
+                        {m.status === 'sent' && (
+                          <div style={{ color: '#16a34a', fontWeight: 600, fontSize: '14px' }}>✅ Sent</div>
+                        )}
                       </div>
                       
                       <div style={{ background: 'var(--surface)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border)', fontSize: '14px', whiteSpace: 'pre-wrap', marginBottom: '24px', maxHeight: '200px', overflowY: 'auto' }}>
@@ -1184,9 +1178,15 @@ function CampaignFlow({ jobId, onClose }: { jobId: string; onClose: () => void }
                           target="_blank"
                           rel="noopener noreferrer"
                           className="btn-primary"
-                          style={{ padding: '14px', fontSize: '16px', background: '#25D366', textAlign: 'center', display: 'block', textDecoration: 'none' }}
+                          style={{ padding: '14px', fontSize: '16px', background: '#25D366', textAlign: 'center', display: 'block', textDecoration: 'none', opacity: m.status === 'sent' ? 0.7 : 1 }}
+                          onClick={() => {
+                            if (m.status !== 'sent') {
+                              fetch(`${API_BASE.replace(/\/$/, '')}/api/outreach/${m.id}/mark_sent`, { method: 'POST' });
+                              setMessages(prev => prev.map(msg => msg.id === m.id ? { ...msg, status: 'sent' } : msg));
+                            }
+                          }}
                         >
-                          💬 Send via WhatsApp
+                          💬 {m.status === 'sent' ? 'Open in WhatsApp Again' : 'Send via WhatsApp'}
                         </a>
                         <button 
                           onClick={() => setWhatsappIndex(prev => prev + 1)}
@@ -1197,17 +1197,20 @@ function CampaignFlow({ jobId, onClose }: { jobId: string; onClose: () => void }
                       </div>
                     </div>
                   )
-                })()
-              ) : (
-                <div style={{ padding: '40px', background: 'var(--surface-alt)', borderRadius: '12px', border: '1px solid var(--border)' }}>
-                  <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎉</div>
-                  <h3 style={{ margin: '0 0 8px', fontSize: '20px' }}>Campaign Complete!</h3>
-                  <p style={{ color: 'var(--text-muted)', margin: 0 }}>You've reached the end of the WhatsApp leads list.</p>
-                  <button className="btn-primary" onClick={onClose} style={{ marginTop: '24px' }}>Close</button>
-                </div>
-              )}
+                } else {
+                  return (
+                    <div style={{ padding: '40px', background: 'var(--surface-alt)', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                      <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎉</div>
+                      <h3 style={{ margin: '0 0 8px', fontSize: '20px' }}>Campaign Complete!</h3>
+                      <p style={{ color: 'var(--text-muted)', margin: 0 }}>You've reached the end of the approved WhatsApp leads list.</p>
+                      <button className="btn-primary" onClick={onClose} style={{ marginTop: '24px' }}>Close</button>
+                    </div>
+                  )
+                }
+              })()}
             </div>
           )}
+
 
           {/* ---- STEP 3: SEND (EMAIL) ---- */}
           {step === 'send' && channel === 'email' && (

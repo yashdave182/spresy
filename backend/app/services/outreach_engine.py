@@ -71,26 +71,33 @@ async def generate_messages(campaign_id: str) -> None:
             db.add(rec)
             db.flush()  # Get rec.id
 
-            # Step 1: Check email & phone
-            is_valid_email = False
-            if lead.email:
-                valid, reason = await validate_email(lead.email, user_id="default")
-                if valid:
-                    is_valid_email = True
+            if campaign.channel == "whatsapp":
+                if lead.phone:
+                    rec.channel = "whatsapp"
+                    rec.to_phone = lead.phone
                 else:
-                    logger.info("Lead %s email invalid: %s", lead.id, reason)
-
-            if is_valid_email:
-                rec.channel = "email"
-                rec.to_email = lead.email
-            elif lead.phone:
-                rec.channel = "whatsapp"
-                rec.to_phone = lead.phone
+                    rec.status = "skipped"
+                    rec.skip_reason = "no_phone_number"
+                    db.commit()
+                    continue
             else:
-                rec.status = "skipped"
-                rec.skip_reason = "no_contact_info"
-                db.commit()
-                continue
+                # Email is the default channel
+                is_valid_email = False
+                if lead.email:
+                    valid, reason = await validate_email(lead.email, user_id="default")
+                    if valid:
+                        is_valid_email = True
+                    else:
+                        logger.info("Lead %s email invalid: %s", lead.id, reason)
+
+                if is_valid_email:
+                    rec.channel = "email"
+                    rec.to_email = lead.email
+                else:
+                    rec.status = "skipped"
+                    rec.skip_reason = "no_valid_email"
+                    db.commit()
+                    continue
 
             # Step 2: Generate personalized message via AI
             try:

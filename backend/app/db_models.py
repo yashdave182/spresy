@@ -88,6 +88,7 @@ class CampaignRecord(Base):
     status               = Column(String, default="draft") # draft/generating/review/running/paused/completed
     batch_size           = Column(Integer, default=5)
     delay_seconds        = Column(Integer, default=10)
+    channel              = Column(String, default="email")
     created_at           = Column(DateTime, default=datetime.datetime.utcnow)
 
     smtp_credential = relationship("SmtpCredentialRecord", back_populates="campaigns")

@@ -260,6 +260,7 @@ async def create_campaign(
     physical_address: str = Form(""),
     email_subject_template: str = Form(""),
     batch_size: int = Form(5),
+    channel: str = Form("email"),
     doc_file_paths: str = Form(""),   # comma-separated file_paths from /api/upload
     doc_filenames: str = Form(""),    # comma-separated original filenames
 ):
@@ -277,6 +278,7 @@ async def create_campaign(
             sender_name=sender_name or None,
             physical_address=physical_address or None,
             batch_size=batch_size,
+            channel=channel,
             status="draft",
         )
         db.add(campaign)
