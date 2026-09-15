@@ -361,6 +361,8 @@ async def list_messages(campaign_id: str):
                 "id": r.id,
                 "lead_name": lead.name if lead else "",
                 "to_email": r.to_email,
+                "to_phone": r.to_phone,
+                "channel": r.channel,
                 "subject": r.generated_subject,
                 "message": r.generated_message,
                 "status": r.status,
@@ -410,6 +412,25 @@ async def approve_message(outreach_id: str):
         rec.status = "approved"
         db.commit()
         return {"id": rec.id, "status": "approved"}
+    finally:
+        db.close()
+
+
+@app.post("/api/outreach/{outreach_id}/mark_sent")
+async def mark_message_sent(outreach_id: str):
+    """Manually mark a message (like WhatsApp) as sent."""
+    from .db_models import OutreachRecord
+    from .database import SessionLocal
+    import datetime
+    db = SessionLocal()
+    try:
+        rec = db.query(OutreachRecord).filter(OutreachRecord.id == outreach_id).first()
+        if not rec:
+            raise HTTPException(404, "Outreach record not found")
+        rec.status = "sent"
+        rec.sent_at = datetime.datetime.utcnow()
+        db.commit()
+        return {"id": rec.id, "status": "sent"}
     finally:
         db.close()
 

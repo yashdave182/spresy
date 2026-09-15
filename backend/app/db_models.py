@@ -124,6 +124,7 @@ class OutreachRecord(Base):
     lead_id           = Column(Integer, ForeignKey("leads.id"), nullable=False)
     channel           = Column(String, default="email")
     to_email          = Column(String, nullable=True)
+    to_phone          = Column(String, nullable=True)
     generated_subject = Column(String, nullable=True)
     generated_message = Column(String, nullable=True)
     user_edited       = Column(Boolean, default=False)

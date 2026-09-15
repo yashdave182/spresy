@@ -71,28 +71,35 @@ async def generate_messages(campaign_id: str) -> None:
             db.add(rec)
             db.flush()  # Get rec.id
 
-            # Step 1: Check email exists
-            if not lead.email:
+            # Step 1: Check email & phone
+            is_valid_email = False
+            if lead.email:
+                valid, reason = await validate_email(lead.email, user_id="default")
+                if valid:
+                    is_valid_email = True
+                else:
+                    logger.info("Lead %s email invalid: %s", lead.id, reason)
+
+            if is_valid_email:
+                rec.channel = "email"
+                rec.to_email = lead.email
+            elif lead.phone:
+                rec.channel = "whatsapp"
+                rec.to_phone = lead.phone
+            else:
                 rec.status = "skipped"
-                rec.skip_reason = "no_email"
+                rec.skip_reason = "no_contact_info"
                 db.commit()
                 continue
 
-            # Step 2: Validate email (syntax + MX + suppression)
-            valid, reason = await validate_email(lead.email, user_id="default")
-            if not valid:
-                rec.status = "skipped"
-                rec.skip_reason = reason
-                db.commit()
-                continue
-
-            # Step 3: Generate personalized message via AI
+            # Step 2: Generate personalized message via AI
             try:
                 subject, body = await _generate_one_message(
                     lead=lead,
                     prompt=campaign.prompt,
                     doc_context=doc_context,
                     sender_name=campaign.sender_name or "",
+                    channel=rec.channel
                 )
                 rec.generated_subject = subject
                 rec.generated_message = body
@@ -120,7 +127,7 @@ async def generate_messages(campaign_id: str) -> None:
         db.close()
 
 
-async def _generate_one_message(lead, prompt: str, doc_context: str, sender_name: str):
+async def _generate_one_message(lead, prompt: str, doc_context: str, sender_name: str, channel: str = "email"):
     """Call Gemini to generate a personalized subject + body for one lead."""
     from ..services.gemini_engine import gemini_engine
     from google.genai import types
@@ -131,7 +138,26 @@ Location: {lead.city or lead.address or 'Unknown'}
 Website: {lead.website or 'N/A'}
 Description: {lead.description or 'N/A'}"""
 
-    system_prompt = f"""You are an expert cold outreach copywriter. Write a personalized cold email from {sender_name or 'me'} to the business described below.
+    if channel == "whatsapp":
+        system_prompt = f"""You are an expert cold outreach copywriter. Write a personalized WhatsApp message from {sender_name or 'me'} to the business described below.
+
+SENDER CONTEXT (from uploaded documents):
+{doc_context or 'No documents provided.'}
+
+USER INSTRUCTIONS:
+{prompt}
+
+TARGET BUSINESS:
+{lead_info}
+
+RULES:
+- Write ONLY the WhatsApp message body
+- Keep it under 50 words, punchy, conversational, and direct
+- Do NOT include a Subject line (this is a WhatsApp message)
+- Use appropriate emojis sparingly
+- Do NOT fabricate specific facts you don't know about the company"""
+    else:
+        system_prompt = f"""You are an expert cold outreach copywriter. Write a personalized cold email from {sender_name or 'me'} to the business described below.
 
 SENDER CONTEXT (from uploaded documents):
 {doc_context or 'No documents provided.'}
@@ -169,13 +195,19 @@ RULES:
     subject = f"Reaching out — {lead.name}"
     body_start = 0
 
-    for i, line in enumerate(lines):
-        if line.upper().startswith("SUBJECT:"):
-            subject = line[8:].strip()
-            body_start = i + 1
-            break
+    if channel == "whatsapp":
+        # No subject expected for WhatsApp, use the whole response as body
+        body = resp.text.strip()
+        subject = ""
+    else:
+        for i, line in enumerate(lines):
+            if line.upper().startswith("SUBJECT:"):
+                subject = line[8:].strip()
+                body_start = i + 1
+                break
 
-    body = "\n".join(lines[body_start:]).strip()
+        body = "\n".join(lines[body_start:]).strip()
+
     return subject, body
 
 
@@ -228,6 +260,7 @@ async def process_batch(campaign_id: str, batch_size: int = 5) -> dict:
             .filter(
                 OutreachRecord.campaign_id == campaign_id,
                 OutreachRecord.status == "approved",
+                OutreachRecord.channel == "email",
             )
             .limit(effective_batch)
             .all()
