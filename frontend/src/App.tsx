@@ -701,10 +701,12 @@ function CampaignFlow({ jobId, onClose }: { jobId: string; onClose: () => void }
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // Setup form state
+  const [channel, setChannel] = useState<'email' | 'whatsapp'>('email')
   const [smtpEmail, setSmtpEmail] = useState('')
   const [smtpPassword, setSmtpPassword] = useState('')
   const [smtpHost, setSmtpHost] = useState('smtp.gmail.com')
   const [smtpPort, setSmtpPort] = useState(587)
+  const [smtpCredentialId, setSmtpCredentialId] = useState<string | null>(null)
   const [senderName, setSenderName] = useState('')
   const [physicalAddress, setPhysicalAddress] = useState('')
   const [prompt, setPrompt] = useState('')
@@ -713,11 +715,42 @@ function CampaignFlow({ jobId, onClose }: { jobId: string; onClose: () => void }
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editSubject, setEditSubject] = useState('')
   const [editBody, setEditBody] = useState('')
+  const [whatsappIndex, setWhatsappIndex] = useState(0)
+  const [whatsappLeads, setWhatsappLeads] = useState<any[]>([])
+
+  // Fetch saved credentials on mount
+  useEffect(() => {
+    fetch(`${API_BASE.replace(/\/$/, '')}/api/smtp`)
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.length > 0) {
+          const cred = data[0] // use the first/default saved credential
+          setSmtpEmail(cred.email)
+          setSmtpHost(cred.smtp_host)
+          setSmtpCredentialId(cred.id)
+          setSmtpPassword('saved_password_placeholder') // so the form looks filled
+        }
+      })
+      .catch(console.error)
+      
+    // Fetch leads for whatsapp dialer
+    fetch(`${API_BASE.replace(/\/$/, '')}/api/jobs/${jobId}/result`)
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.leads) {
+          setWhatsappLeads(data.leads.filter((l: any) => l.phone))
+        }
+      })
+      .catch(console.error)
+  }, [jobId])
 
   // Auto-detect SMTP host from email
   const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value
     setSmtpEmail(val)
+    if (val !== smtpEmail) setSmtpCredentialId(null) // clear saved ID if they change the email
+    if (smtpPassword === 'saved_password_placeholder') setSmtpPassword('')
+
     if (val.includes('@gmail.com')) { setSmtpHost('smtp.gmail.com'); setSmtpPort(587) }
     else if (val.includes('@outlook.com') || val.includes('@hotmail.com')) { setSmtpHost('smtp-mail.outlook.com'); setSmtpPort(587) }
     else if (val.includes('@yahoo.com')) { setSmtpHost('smtp.mail.yahoo.com'); setSmtpPort(587) }
@@ -747,27 +780,40 @@ function CampaignFlow({ jobId, onClose }: { jobId: string; onClose: () => void }
   }
 
   const handleCreateCampaign = async () => {
+    if (channel === 'whatsapp') {
+      if (!prompt.trim()) { setError('Please enter a WhatsApp message template.'); return }
+      if (whatsappLeads.length === 0) { setError('No leads with phone numbers found for this job.'); return }
+      setStep('send')
+      return
+    }
+
     if (!prompt.trim()) { setError('Please enter outreach instructions.'); return }
     if (!smtpEmail || !smtpPassword) { setError('Please enter your email and app password.'); return }
     setError(null)
     setBusy(true)
     try {
-      // Save SMTP credentials
-      const smtpFd = new FormData()
-      smtpFd.append('email', smtpEmail)
-      smtpFd.append('smtp_host', smtpHost)
-      smtpFd.append('smtp_port', String(smtpPort))
-      smtpFd.append('password', smtpPassword)
-      smtpFd.append('sender_name', senderName)
-      const smtpResp = await fetch(`${API_BASE.replace(/\/$/, '')}/api/smtp`, { method: 'POST', body: smtpFd })
-      if (!smtpResp.ok) throw new Error('Failed to save SMTP credentials')
-      const smtpData = await smtpResp.json()
+      let finalCredId = smtpCredentialId
+
+      // If we don't have a saved credential selected, or they typed a new password, save it
+      if (!finalCredId || (smtpPassword && smtpPassword !== 'saved_password_placeholder')) {
+        const smtpFd = new FormData()
+        smtpFd.append('email', smtpEmail)
+        smtpFd.append('smtp_host', smtpHost)
+        smtpFd.append('smtp_port', String(smtpPort))
+        smtpFd.append('password', smtpPassword)
+        smtpFd.append('sender_name', senderName)
+        const smtpResp = await fetch(`${API_BASE.replace(/\/$/, '')}/api/smtp`, { method: 'POST', body: smtpFd })
+        if (!smtpResp.ok) throw new Error('Failed to save SMTP credentials')
+        const smtpData = await smtpResp.json()
+        finalCredId = smtpData.id
+        setSmtpCredentialId(finalCredId)
+      }
 
       // Create campaign
       const campFd = new FormData()
       campFd.append('job_id', jobId)
       campFd.append('prompt', prompt)
-      campFd.append('smtp_credential_id', smtpData.id)
+      campFd.append('smtp_credential_id', finalCredId || '')
       campFd.append('sender_name', senderName)
       campFd.append('physical_address', physicalAddress || 'India')
       campFd.append('doc_file_paths', uploadedFiles.map(f => f.file_path).join(','))
@@ -917,95 +963,113 @@ function CampaignFlow({ jobId, onClose }: { jobId: string; onClose: () => void }
           {/* ---- STEP 1: SETUP ---- */}
           {step === 'setup' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+              
+              <section>
+                <div style={{ display: 'flex', gap: '12px', padding: '4px', background: 'var(--surface-alt)', borderRadius: '8px', width: 'fit-content' }}>
+                  <button onClick={() => setChannel('email')} style={{ padding: '8px 24px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontWeight: 600, background: channel === 'email' ? 'var(--accent)' : 'transparent', color: channel === 'email' ? 'white' : 'var(--text-muted)' }}>✉️ AI Email Outreach</button>
+                  <button onClick={() => setChannel('whatsapp')} style={{ padding: '8px 24px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontWeight: 600, background: channel === 'whatsapp' ? '#25D366' : 'transparent', color: channel === 'whatsapp' ? 'white' : 'var(--text-muted)' }}>💬 WhatsApp Dialer</button>
+                </div>
+              </section>
 
               {/* Email Settings */}
-              <section>
-                <h3 style={{ margin: '0 0 16px', fontSize: '15px', fontWeight: 600, color: 'var(--accent)' }}>📧 Email Settings</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                  <div>
-                    <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>Your Email *</label>
-                    <input className="field-input" type="email" placeholder="you@gmail.com" value={smtpEmail} onChange={handleEmailChange} style={{ width: '100%' }} />
+              {channel === 'email' && (
+                <section>
+                  <h3 style={{ margin: '0 0 16px', fontSize: '15px', fontWeight: 600, color: 'var(--accent)' }}>📧 Email Settings</h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                    <div>
+                      <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>Your Email *</label>
+                      <input className="field-input" type="email" placeholder="you@gmail.com" value={smtpEmail} onChange={handleEmailChange} style={{ width: '100%' }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
+                        App Password * <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', fontSize: '11px' }}>Get Gmail App Password →</a>
+                      </label>
+                      <input className="field-input" type="password" placeholder="xxxx xxxx xxxx xxxx" value={smtpPassword} onChange={e => { setSmtpPassword(e.target.value); if (smtpCredentialId) setSmtpCredentialId(null); }} style={{ width: '100%' }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>Display Name</label>
+                      <input className="field-input" type="text" placeholder="Yash Dave" value={senderName} onChange={e => setSenderName(e.target.value)} style={{ width: '100%' }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>Physical Address <span style={{ fontSize: '10px' }}>(CAN-SPAM required)</span></label>
+                      <input className="field-input" type="text" placeholder="123 Main St, Ahmedabad, India" value={physicalAddress} onChange={e => setPhysicalAddress(e.target.value)} style={{ width: '100%' }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>SMTP Host</label>
+                      <input className="field-input" type="text" value={smtpHost} onChange={e => setSmtpHost(e.target.value)} style={{ width: '100%' }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>SMTP Port</label>
+                      <input className="field-input" type="number" value={smtpPort} onChange={e => setSmtpPort(Number(e.target.value))} style={{ width: '100%' }} />
+                    </div>
                   </div>
-                  <div>
-                    <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
-                      App Password * <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', fontSize: '11px' }}>Get Gmail App Password →</a>
-                    </label>
-                    <input className="field-input" type="password" placeholder="xxxx xxxx xxxx xxxx" value={smtpPassword} onChange={e => setSmtpPassword(e.target.value)} style={{ width: '100%' }} />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>Display Name</label>
-                    <input className="field-input" type="text" placeholder="Yash Dave" value={senderName} onChange={e => setSenderName(e.target.value)} style={{ width: '100%' }} />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>Physical Address <span style={{ fontSize: '10px' }}>(CAN-SPAM required)</span></label>
-                    <input className="field-input" type="text" placeholder="123 Main St, Ahmedabad, India" value={physicalAddress} onChange={e => setPhysicalAddress(e.target.value)} style={{ width: '100%' }} />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>SMTP Host</label>
-                    <input className="field-input" type="text" value={smtpHost} onChange={e => setSmtpHost(e.target.value)} style={{ width: '100%' }} />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>SMTP Port</label>
-                    <input className="field-input" type="number" value={smtpPort} onChange={e => setSmtpPort(Number(e.target.value))} style={{ width: '100%' }} />
-                  </div>
-                </div>
-              </section>
+                </section>
+              )}
 
               {/* Document Upload */}
-              <section>
-                <h3 style={{ margin: '0 0 16px', fontSize: '15px', fontWeight: 600, color: 'var(--accent)' }}>📎 Upload Documents</h3>
-                <div
-                  style={{ border: '2px dashed var(--border)', borderRadius: '12px', padding: '32px', textAlign: 'center', cursor: 'pointer', transition: 'border-color 0.2s', position: 'relative' }}
-                  onDragOver={e => { e.preventDefault(); (e.currentTarget as HTMLElement).style.borderColor = 'var(--accent)' }}
-                  onDragLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)' }}
-                  onDrop={async e => { e.preventDefault(); (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'; await handleFileUpload(e.dataTransfer.files) }}
-                  onClick={() => document.getElementById('doc-upload-input')?.click()}
-                >
-                  <input id="doc-upload-input" type="file" multiple accept=".pdf,.docx,.doc,.txt,.md,.png,.jpg,.jpeg" style={{ display: 'none' }} onChange={e => handleFileUpload(e.target.files)} />
-                  {uploading ? (
-                    <><span className="spinner" style={{ marginRight: '8px' }}></span>Uploading...</>
-                  ) : (
-                    <>
-                      <div style={{ fontSize: '32px', marginBottom: '8px' }}>📄</div>
-                      <div style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Drop files here or click to browse</div>
-                      <div style={{ color: 'var(--text-muted)', fontSize: '12px', marginTop: '4px' }}>PDF, DOCX, TXT, images — resume, portfolio, pitch deck</div>
-                    </>
-                  )}
-                </div>
-                {uploadedFiles.length > 0 && (
-                  <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {uploadedFiles.map((f, i) => (
-                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', background: 'var(--surface-alt)', borderRadius: '8px', fontSize: '13px' }}>
-                        <span>📄</span>
-                        <span style={{ fontWeight: 500 }}>{f.filename}</span>
-                        <span style={{ color: 'var(--text-muted)', fontSize: '11px', flexGrow: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.preview}</span>
-                        <button onClick={() => setUploadedFiles(prev => prev.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '14px' }}>✕</button>
-                      </div>
-                    ))}
+              {channel === 'email' && (
+                <section>
+                  <h3 style={{ margin: '0 0 16px', fontSize: '15px', fontWeight: 600, color: 'var(--accent)' }}>📎 Upload Documents</h3>
+                  <div
+                    style={{ border: '2px dashed var(--border)', borderRadius: '12px', padding: '32px', textAlign: 'center', cursor: 'pointer', transition: 'border-color 0.2s', position: 'relative' }}
+                    onDragOver={e => { e.preventDefault(); (e.currentTarget as HTMLElement).style.borderColor = 'var(--accent)' }}
+                    onDragLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)' }}
+                    onDrop={async e => { e.preventDefault(); (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'; await handleFileUpload(e.dataTransfer.files) }}
+                    onClick={() => document.getElementById('doc-upload-input')?.click()}
+                  >
+                    <input id="doc-upload-input" type="file" multiple accept=".pdf,.docx,.doc,.txt,.md,.png,.jpg,.jpeg" style={{ display: 'none' }} onChange={e => handleFileUpload(e.target.files)} />
+                    {uploading ? (
+                      <><span className="spinner" style={{ marginRight: '8px' }}></span>Uploading...</>
+                    ) : (
+                      <>
+                        <div style={{ fontSize: '32px', marginBottom: '8px' }}>📄</div>
+                        <div style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Drop files here or click to browse</div>
+                        <div style={{ color: 'var(--text-muted)', fontSize: '12px', marginTop: '4px' }}>PDF, DOCX, TXT, images — resume, portfolio, pitch deck</div>
+                      </>
+                    )}
                   </div>
-                )}
-              </section>
+                  {uploadedFiles.length > 0 && (
+                    <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {uploadedFiles.map((f, i) => (
+                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', background: 'var(--surface-alt)', borderRadius: '8px', fontSize: '13px' }}>
+                          <span>📄</span>
+                          <span style={{ fontWeight: 500 }}>{f.filename}</span>
+                          <span style={{ color: 'var(--text-muted)', fontSize: '11px', flexGrow: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.preview}</span>
+                          <button onClick={() => setUploadedFiles(prev => prev.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '14px' }}>✕</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              )}
 
               {/* Prompt */}
               <section>
-                <h3 style={{ margin: '0 0 16px', fontSize: '15px', fontWeight: 600, color: 'var(--accent)' }}>✨ Outreach Instructions</h3>
+                <h3 style={{ margin: '0 0 16px', fontSize: '15px', fontWeight: 600, color: channel === 'whatsapp' ? '#25D366' : 'var(--accent)' }}>
+                  {channel === 'whatsapp' ? '💬 WhatsApp Message Template' : '✨ Outreach Instructions'}
+                </h3>
+                {channel === 'whatsapp' && (
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px' }}>
+                    Available variables: <code style={{ background: 'var(--surface-alt)', padding: '2px 4px', borderRadius: '4px' }}>{'{name}'}</code>, <code style={{ background: 'var(--surface-alt)', padding: '2px 4px', borderRadius: '4px' }}>{'{company}'}</code>, <code style={{ background: 'var(--surface-alt)', padding: '2px 4px', borderRadius: '4px' }}>{'{city}'}</code>
+                  </div>
+                )}
                 <textarea
                   className="field-input"
                   rows={5}
                   style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit' }}
-                  placeholder={`Example: "I'm a full-stack developer with 3 years of experience in React and Node.js. I'm looking for a junior/mid-level developer role. Please write a personalized cold email applying to each company, referencing my resume, and asking about open positions."`}
+                  placeholder={channel === 'whatsapp' ? `Hi {name},\n\nI noticed {company} in {city} and wanted to reach out regarding...` : `Example: "I'm a full-stack developer..."`}
                   value={prompt}
                   onChange={e => setPrompt(e.target.value)}
                 />
                 <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '6px' }}>
-                  AI will read your documents and use these instructions to craft a unique message for each lead.
+                  {channel === 'whatsapp' ? 'We will pre-fill this message in WhatsApp Web for each lead with a phone number.' : 'AI will read your documents and use these instructions to craft a unique message for each lead.'}
                 </div>
               </section>
             </div>
           )}
 
           {/* ---- STEP 2: REVIEW ---- */}
-          {step === 'review' && (
+          {step === 'review' && channel === 'email' && (
             <div>
               {campaignStatus === 'generating' && (
                 <div style={{ textAlign: 'center', padding: '40px 0' }}>
@@ -1085,8 +1149,68 @@ function CampaignFlow({ jobId, onClose }: { jobId: string; onClose: () => void }
             </div>
           )}
 
-          {/* ---- STEP 3: SEND ---- */}
-          {step === 'send' && (
+          {/* ---- STEP 3: SEND (WHATSAPP DIALER) ---- */}
+          {step === 'send' && channel === 'whatsapp' && (
+            <div style={{ textAlign: 'center', padding: '20px 0' }}>
+              <div style={{ fontSize: '18px', fontWeight: 600, marginBottom: '24px' }}>
+                WhatsApp Power Dialer ({whatsappIndex + 1} of {whatsappLeads.length})
+              </div>
+              
+              {whatsappLeads.length > 0 && whatsappIndex < whatsappLeads.length ? (
+                (() => {
+                  const lead = whatsappLeads[whatsappIndex];
+                  const rawPhone = lead.phone.replace(/[^0-9+]/g, '');
+                  let parsedMessage = prompt
+                    .replace(/\{name\}/gi, lead.name || 'there')
+                    .replace(/\{company\}/gi, lead.name || 'your company')
+                    .replace(/\{city\}/gi, lead.city || 'your city');
+                  
+                  return (
+                    <div style={{ background: 'var(--surface-alt)', border: '1px solid var(--border)', borderRadius: '12px', padding: '32px', maxWidth: '500px', margin: '0 auto', textAlign: 'left' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
+                        <div>
+                          <div style={{ fontWeight: 600, fontSize: '16px' }}>{lead.name}</div>
+                          <div style={{ color: 'var(--text-muted)', fontSize: '14px', marginTop: '4px' }}>📞 {lead.phone}</div>
+                        </div>
+                      </div>
+                      
+                      <div style={{ background: 'var(--surface)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border)', fontSize: '14px', whiteSpace: 'pre-wrap', marginBottom: '24px', maxHeight: '200px', overflowY: 'auto' }}>
+                        {parsedMessage}
+                      </div>
+                      
+                      <div style={{ display: 'flex', gap: '12px', flexDirection: 'column' }}>
+                        <a 
+                          href={`https://wa.me/${rawPhone}?text=${encodeURIComponent(parsedMessage)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="btn-primary"
+                          style={{ padding: '14px', fontSize: '16px', background: '#25D366', textAlign: 'center', display: 'block', textDecoration: 'none' }}
+                        >
+                          💬 Send via WhatsApp
+                        </a>
+                        <button 
+                          onClick={() => setWhatsappIndex(prev => prev + 1)}
+                          style={{ padding: '14px', fontSize: '15px', background: 'none', border: '1px solid var(--border)', borderRadius: '8px', cursor: 'pointer', color: 'var(--text)', fontWeight: 600 }}
+                        >
+                          Next Lead →
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })()
+              ) : (
+                <div style={{ padding: '40px', background: 'var(--surface-alt)', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                  <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎉</div>
+                  <h3 style={{ margin: '0 0 8px', fontSize: '20px' }}>Campaign Complete!</h3>
+                  <p style={{ color: 'var(--text-muted)', margin: 0 }}>You've reached the end of the WhatsApp leads list.</p>
+                  <button className="btn-primary" onClick={onClose} style={{ marginTop: '24px' }}>Close</button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ---- STEP 3: SEND (EMAIL) ---- */}
+          {step === 'send' && channel === 'email' && (
             <div>
               {/* Stats */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '28px' }}>
@@ -1148,8 +1272,8 @@ function CampaignFlow({ jobId, onClose }: { jobId: string; onClose: () => void }
         <div style={{ padding: '16px 28px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
           <button onClick={onClose} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 18px', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '13px' }}>Close</button>
           {step === 'setup' && (
-            <button className="btn-primary" onClick={handleCreateCampaign} disabled={busy || !prompt.trim() || !smtpEmail || !smtpPassword}>
-              {busy ? <><span className="spinner" style={{ marginRight: '8px' }}></span>Creating...</> : 'Generate Messages →'}
+            <button className="btn-primary" onClick={handleCreateCampaign} disabled={busy || !prompt.trim() || (channel === 'email' && (!smtpEmail || !smtpPassword))}>
+              {busy ? <><span className="spinner" style={{ marginRight: '8px' }}></span>Creating...</> : channel === 'whatsapp' ? 'Start Dialer →' : 'Generate Messages →'}
             </button>
           )}
         </div>
