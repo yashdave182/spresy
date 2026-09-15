@@ -716,7 +716,6 @@ function CampaignFlow({ jobId, onClose }: { jobId: string; onClose: () => void }
   const [editSubject, setEditSubject] = useState('')
   const [editBody, setEditBody] = useState('')
   const [whatsappIndex, setWhatsappIndex] = useState(0)
-  const [whatsappLeads, setWhatsappLeads] = useState<any[]>([])
 
   // Fetch saved credentials on mount
   useEffect(() => {
@@ -729,16 +728,6 @@ function CampaignFlow({ jobId, onClose }: { jobId: string; onClose: () => void }
           setSmtpHost(cred.smtp_host)
           setSmtpCredentialId(cred.id)
           setSmtpPassword('saved_password_placeholder') // so the form looks filled
-        }
-      })
-      .catch(console.error)
-      
-    // Fetch leads for whatsapp dialer
-    fetch(`${API_BASE.replace(/\/$/, '')}/api/jobs/${jobId}/result`)
-      .then(res => res.json())
-      .then(data => {
-        if (data && data.leads) {
-          setWhatsappLeads(data.leads.filter((l: any) => l.phone))
         }
       })
       .catch(console.error)
